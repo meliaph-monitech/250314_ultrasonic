@@ -55,6 +55,7 @@ def extract_features(signal):
     n = len(signal)
     if n == 0:
         return [0] * 20
+
     mean_val = np.mean(signal)
     std_val = np.std(signal)
     min_val = np.min(signal)
@@ -65,6 +66,8 @@ def extract_features(signal):
     peak_to_peak = max_val - min_val
     energy = np.sum(signal**2)
     cv = std_val / mean_val if mean_val != 0 else 0
+
+    # FFT and spectral analysis
     signal_fft = fft(signal)
     psd = np.abs(signal_fft)**2
     freqs = fftfreq(n, 1)
@@ -73,16 +76,32 @@ def extract_features(signal):
     dominant_freq = positive_freqs[np.argmax(positive_psd)] if len(positive_psd) > 0 else 0
     psd_normalized = positive_psd / np.sum(positive_psd) if np.sum(positive_psd) > 0 else np.zeros_like(positive_psd)
     spectral_entropy = -np.sum(psd_normalized * np.log2(psd_normalized + 1e-12))
+
+    # Autocorrelation
     autocorrelation = np.corrcoef(signal[:-1], signal[1:])[0, 1] if n > 1 else 0
     peaks, _ = find_peaks(signal)
     peak_count = len(peaks)
     zero_crossing_rate = np.sum(np.diff(np.sign(signal)) != 0) / n
     rms = np.sqrt(np.mean(signal**2))
+
+    # Linear regression (with error handling)
     x = np.arange(n)
-    slope, _ = np.polyfit(x, signal, 1)
+    try:
+        slope, _ = np.polyfit(x, signal, 1)
+    except np.linalg.LinAlgError:  # Catch SVD convergence errors
+        slope = 0  # Assign a default value
+    except ValueError:  # Catch errors for empty or invalid data
+        slope = 0
+
+    # Moving average
     rolling_window = max(10, n // 10)
-    rolling_mean = np.convolve(signal, np.ones(rolling_window) / rolling_window, mode='valid')
-    moving_average = np.mean(rolling_mean)
+    if n >= rolling_window:
+        rolling_mean = np.convolve(signal, np.ones(rolling_window) / rolling_window, mode='valid')
+        moving_average = np.mean(rolling_mean)
+    else:
+        moving_average = mean_val  # Default to mean if signal is too short
+
+    # Outlier detection and extreme event duration
     threshold = 3 * std_val
     outlier_count = np.sum(np.abs(signal - mean_val) > threshold)
     extreme_event_duration = 0
@@ -93,8 +112,9 @@ def extract_features(signal):
         else:
             extreme_event_duration = max(extreme_event_duration, current_duration)
             current_duration = 0
-    return [mean_val, std_val, min_val, max_val, median_val, skewness, kurt, peak_to_peak, energy, cv,
-            dominant_freq, spectral_entropy, autocorrelation, peak_count, zero_crossing_rate, rms,
+
+    return [mean_val, std_val, min_val, max_val, median_val, skewness, kurt, peak_to_peak, energy, cv, 
+            dominant_freq, spectral_entropy, autocorrelation, peak_count, zero_crossing_rate, rms, 
             slope, moving_average, outlier_count, extreme_event_duration]
 
 # Main function
