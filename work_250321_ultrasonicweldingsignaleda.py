@@ -15,25 +15,37 @@ def extract_zip(uploaded_file, extract_to="extracted_data"):
         zip_ref.extractall(extract_to)
     return [os.path.join(extract_to, f) for f in os.listdir(extract_to) if f.endswith('.csv')]
 
-# Function to separate welding phases
-def separate_welding_phases(signal_data, threshold=None):
-    if threshold is None:
-        threshold = signal_data.std() * 2  # Adaptive threshold based on standard deviation
+# Function to automatically determine the threshold
+def determine_threshold(signal_data):
+    """
+    Automatically determines the threshold for welding phase separation
+    using the interquartile range (IQR) method.
+    """
+    q1 = np.percentile(signal_data, 25)  # First quartile
+    q3 = np.percentile(signal_data, 75)  # Third quartile
+    iqr = q3 - q1  # Interquartile range
+    return q3 + 1.5 * iqr  # Upper bound for outliers
 
+# Function to separate welding phases
+def separate_welding_phases(signal_data):
+    if signal_data.empty:  # Handle empty signal data
+        return []
+    
+    threshold = determine_threshold(signal_data)  # Automatically determine threshold
     welding_mask = np.abs(signal_data) > threshold
     welding_phases = []
 
     # Identify welding phase start and end indices
     change_points = np.where(np.diff(welding_mask.astype(int)) != 0)[0] + 1
-    if welding_mask[0]:  # If signal starts in a welding phase
+    if welding_mask.iloc[0]:  # If signal starts in a welding phase
         change_points = np.insert(change_points, 0, 0)
-    if welding_mask[-1]:  # If signal ends in a welding phase
+    if welding_mask.iloc[-1]:  # If signal ends in a welding phase
         change_points = np.append(change_points, len(signal_data))
 
     # Extract welding phases (only first two are considered)
     for i in range(0, len(change_points) - 1, 2):
         if len(welding_phases) < 2:  # Limit to two welding phases
-            welding_phases.append(signal_data[change_points[i]:change_points[i + 1]])
+            welding_phases.append(signal_data.iloc[change_points[i]:change_points[i + 1]])
         else:
             break
 
@@ -70,18 +82,22 @@ def main():
         if st.sidebar.button("Segment Welding Phases"):
             segments = []
             for file_path in file_paths:
-                df = pd.read_csv(file_path, header=None)
-                signal = df[0]
-                file_name = os.path.basename(file_path)
+                try:
+                    df = pd.read_csv(file_path, header=None)
+                    signal = df[0]
+                    file_name = os.path.basename(file_path)
 
-                # Separate welding phases
-                welding_phases = separate_welding_phases(signal)
-                for i, phase in enumerate(welding_phases):
-                    segments.append({
-                        "file_name": file_name,
-                        "phase_id": i + 1,
-                        "signal": phase
-                    })
+                    # Separate welding phases
+                    welding_phases = separate_welding_phases(signal)
+                    for i, phase in enumerate(welding_phases):
+                        segments.append({
+                            "file_name": file_name,
+                            "phase_id": i + 1,
+                            "signal": phase
+                        })
+                except Exception as e:
+                    st.error(f"Error processing file {file_path}: {e}")
+                    continue
 
             st.session_state["segments"] = segments
             st.sidebar.success("Welding phases segmented successfully!")
