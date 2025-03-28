@@ -104,7 +104,7 @@ def main():
                         })
 
                     # Plot the original signal and rolling variance
-                    plt.figure(figsize=(12, 6))
+                    plt.figure(figsize=(24, 6))
                     plt.plot(signal, label="Original Signal", color="black", alpha=0.7)
                     rolling_variance = compute_rolling_variance(signal)
                     plt.plot(rolling_variance, label="Rolling Variance", color="red", alpha=0.7)
