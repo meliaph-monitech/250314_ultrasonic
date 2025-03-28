@@ -5,7 +5,6 @@ import os
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.cluster import KMeans
 from sklearn.ensemble import IsolationForest
 from scipy.stats import skew, kurtosis
 
@@ -16,39 +15,29 @@ def extract_zip(uploaded_file, extract_to="extracted_data"):
         zip_ref.extractall(extract_to)
     return [os.path.join(extract_to, f) for f in os.listdir(extract_to) if f.endswith('.csv')]
 
-# Function to compute rolling variance
-def compute_rolling_variance(signal_data, window_size=50):  # Default value = 50
+# Function to compute the gradient of the signal
+def compute_gradient(signal_data):
     """
-    Computes the rolling variance of the signal data.
+    Computes the gradient (first derivative) of the signal.
     """
-    return signal_data.rolling(window=window_size, center=True).var()
+    return np.gradient(signal_data)
 
-# Function to determine threshold using clustering
-def determine_threshold_with_clustering(rolling_variance):
-    """
-    Determines the threshold for high-variance regions using K-Means clustering.
-    """
-    rolling_variance = rolling_variance.dropna().values.reshape(-1, 1)  # Reshape for clustering
-    kmeans = KMeans(n_clusters=2, random_state=42).fit(rolling_variance)
-    cluster_centers = kmeans.cluster_centers_.flatten()
-    return max(cluster_centers)  # Use the higher cluster center as the threshold
-
-# Function to separate welding phases using variance
-def separate_welding_phases_by_clustering(signal_data, window_size=50):
+# Function to separate welding phases using gradient-based detection
+def separate_welding_phases_by_gradient(signal_data, gradient_threshold, window_size=50):
     if signal_data.empty:  # Handle empty signal data
         return []
 
-    # Compute rolling variance
-    rolling_variance = compute_rolling_variance(signal_data, window_size=window_size)
+    # Compute the gradient of the signal
+    gradient = compute_gradient(signal_data)
 
-    # Determine threshold using clustering
-    threshold = determine_threshold_with_clustering(rolling_variance)
+    # Smooth the gradient using a rolling mean to reduce noise
+    smoothed_gradient = pd.Series(gradient).rolling(window=window_size, center=True).mean()
 
-    # Create a mask for high-variance regions
-    welding_mask = rolling_variance > threshold
+    # Create a mask for regions where the gradient exceeds the threshold
+    welding_mask = smoothed_gradient.abs() > gradient_threshold
     welding_phases = []
 
-    # Identify welding phase start and end indices
+    # Identify start and end indices of welding phases
     change_points = np.where(np.diff(welding_mask.astype(int)) != 0)[0] + 1
     if welding_mask.iloc[0]:  # If signal starts in a welding phase
         change_points = np.insert(change_points, 0, 0)
@@ -92,6 +81,18 @@ def main():
         file_paths = extract_zip(uploaded_file)
         st.sidebar.write(f"Total CSV files: {len(file_paths)}")
 
+        # Slider for selecting gradient threshold
+        gradient_threshold = st.sidebar.slider(
+            "Set Gradient Threshold for Welding Phase Segmentation",
+            min_value=0.0, max_value=10.0, value=0.5, step=0.1
+        )
+
+        # Window size for smoothing the gradient
+        window_size = st.sidebar.slider(
+            "Set Smoothing Window Size",
+            min_value=1, max_value=100, value=50, step=1
+        )
+
         if st.sidebar.button("Segment Welding Phases"):
             segments = []
             for file_path in file_paths:
@@ -100,8 +101,12 @@ def main():
                     signal = df[0]
                     file_name = os.path.basename(file_path)
 
-                    # Separate welding phases using clustering-based method
-                    welding_phases = separate_welding_phases_by_clustering(signal)
+                    # Separate welding phases using gradient-based method
+                    welding_phases = separate_welding_phases_by_gradient(
+                        signal_data=signal, 
+                        gradient_threshold=gradient_threshold, 
+                        window_size=window_size
+                    )
                     for i, phase in enumerate(welding_phases):
                         segments.append({
                             "file_name": file_name,
@@ -109,11 +114,12 @@ def main():
                             "signal": phase
                         })
 
-                    # Plot the original signal and rolling variance
+                    # Plot the original signal, gradient, and detected welding phases
                     plt.figure(figsize=(12, 6))
                     plt.plot(signal, label="Original Signal", color="black", alpha=0.7)
-                    rolling_variance = compute_rolling_variance(signal)
-                    plt.plot(rolling_variance, label="Rolling Variance", color="red", alpha=0.7)
+                    gradient = compute_gradient(signal)
+                    smoothed_gradient = pd.Series(gradient).rolling(window=window_size, center=True).mean()
+                    plt.plot(smoothed_gradient, label="Smoothed Gradient", color="red", alpha=0.7)
 
                     # Highlight segmented welding phases
                     for i, phase in enumerate(welding_phases):
@@ -123,7 +129,7 @@ def main():
 
                     plt.title(f"Signal Segmentation for {file_name}")
                     plt.xlabel("Time")
-                    plt.ylabel("Signal Value / Variance")
+                    plt.ylabel("Signal Value / Gradient")
                     plt.legend()
                     plt.grid(True)
                     st.pyplot(plt)
