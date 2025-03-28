@@ -10,10 +10,18 @@ from scipy.stats import skew, kurtosis
 
 # Function to extract ZIP files
 def extract_zip(uploaded_file, extract_to="extracted_data"):
-    os.makedirs(extract_to, exist_ok=True)
+    # Clear the extraction folder before extracting new files
+    if os.path.exists(extract_to):
+        for file in os.listdir(extract_to):
+            os.remove(os.path.join(extract_to, file))
+    else:
+        os.makedirs(extract_to, exist_ok=True)
+
     with zipfile.ZipFile(uploaded_file, 'r') as zip_ref:
         zip_ref.extractall(extract_to)
+
     return [os.path.join(extract_to, f) for f in os.listdir(extract_to) if f.endswith('.csv')]
+
 
 # Function to compute rolling variance
 def compute_rolling_variance(signal_data, window_size=50):  # Default value = 50
