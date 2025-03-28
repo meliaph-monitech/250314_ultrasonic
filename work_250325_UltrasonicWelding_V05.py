@@ -43,10 +43,12 @@ def separate_welding_phases_by_variance(signal_data, threshold, window_size=50):
 
     # Extract welding phases (only first two are considered)
     for i in range(0, len(change_points) - 1, 2):
-        if len(welding_phases) < 2:  # Limit to two welding phases
-            welding_phases.append(signal_data.iloc[change_points[i]:change_points[i + 1]])
-        else:
-            break
+        phase = signal_data.iloc[change_points[i]:change_points[i + 1]]
+        if len(phase) > 10000:  # Only include phases with length > 10,000
+            if len(welding_phases) < 2:  # Limit to two welding phases
+                welding_phases.append(phase)
+            else:
+                break
 
     return welding_phases
 
