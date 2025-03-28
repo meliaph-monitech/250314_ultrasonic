@@ -101,10 +101,34 @@ def main():
 
             st.session_state["segments"] = segments
             st.sidebar.success("Welding phases segmented successfully!")
-            st.write("## Segmented Welding Phases")
-            st.write(f"Total segmented phases: {len(segments)}")
-            for segment in segments:
-                st.write(f"File: {segment['file_name']}, Phase ID: {segment['phase_id']}, Length: {len(segment['signal'])}")
+
+            # Visualization of segmentation
+            st.write("## Segmented Welding Phases Visualization")
+            for file_path in file_paths:
+                try:
+                    df = pd.read_csv(file_path, header=None)
+                    signal = df[0]
+                    file_name = os.path.basename(file_path)
+
+                    # Plot the original signal with segmented phases
+                    plt.figure(figsize=(12, 6))
+                    plt.plot(signal, label="Original Signal", color="black", alpha=0.7)
+
+                    # Highlight segmented welding phases
+                    welding_phases = separate_welding_phases(signal)
+                    for i, phase in enumerate(welding_phases):
+                        start_idx = phase.index[0]
+                        end_idx = phase.index[-1]
+                        plt.axvspan(start_idx, end_idx, color="blue" if i == 0 else "green", alpha=0.3, label=f"Phase {i + 1}")
+
+                    plt.title(f"Signal Segmentation for {file_name}")
+                    plt.xlabel("Time")
+                    plt.ylabel("Signal Value")
+                    plt.legend()
+                    plt.grid(True)
+                    st.pyplot(plt)
+                except Exception as e:
+                    st.error(f"Error visualizing file {file_name}: {e}")
 
         if "segments" in st.session_state and st.sidebar.button("Extract Features"):
             segments = st.session_state["segments"]
