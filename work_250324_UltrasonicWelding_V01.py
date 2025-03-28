@@ -31,7 +31,7 @@ def determine_threshold_from_variance(rolling_variance):
     q1 = np.percentile(rolling_variance.dropna(), 25)  # First quartile
     q3 = np.percentile(rolling_variance.dropna(), 75)  # Third quartile
     iqr = q3 - q1  # Interquartile range
-    return q3 + 1.5 * iqr  # Upper bound for outliers
+    return q3 + 3.5 * iqr  # Upper bound for outliers
 
 # Function to separate welding phases using variance
 def separate_welding_phases_by_variance(signal_data, window_size=50):
