@@ -16,33 +16,19 @@ def extract_zip(uploaded_file, extract_to="extracted_data"):
     return [os.path.join(extract_to, f) for f in os.listdir(extract_to) if f.endswith('.csv')]
 
 # Function to compute rolling variance
-def compute_rolling_variance(signal_data, window_size=50): #Original value = 50
+def compute_rolling_variance(signal_data, window_size=50):  # Default value = 50
     """
     Computes the rolling variance of the signal data.
     """
     return signal_data.rolling(window=window_size, center=True).var()
 
-# Function to automatically determine the threshold for variance
-def determine_threshold_from_variance(rolling_variance):
-    """
-    Automatically determines the threshold for separating high-variance (welding) phases
-    using the interquartile range (IQR) method.
-    """
-    q1 = np.percentile(rolling_variance.dropna(), 25)  # First quartile
-    q3 = np.percentile(rolling_variance.dropna(), 75)  # Third quartile
-    iqr = q3 - q1  # Interquartile range
-    return q3 + 1.5 * iqr  # Upper bound for outliers
-
-# Function to separate welding phases using variance
-def separate_welding_phases_by_variance(signal_data, window_size=500): #Original value = 50
+# Function to separate welding phases using a user-defined variance threshold
+def separate_welding_phases_by_variance(signal_data, threshold, window_size=50):
     if signal_data.empty:  # Handle empty signal data
         return []
 
     # Compute rolling variance
     rolling_variance = compute_rolling_variance(signal_data, window_size=window_size)
-
-    # Automatically determine threshold
-    threshold = determine_threshold_from_variance(rolling_variance)
 
     # Create a mask for high-variance regions
     welding_mask = rolling_variance > threshold
@@ -92,6 +78,12 @@ def main():
         file_paths = extract_zip(uploaded_file)
         st.sidebar.write(f"Total CSV files: {len(file_paths)}")
 
+        # Slider for selecting variance threshold
+        variance_threshold = st.sidebar.slider(
+            "Set Variance Threshold for Welding Phase Segmentation",
+            min_value=0.0, max_value=1.0, value=0.01, step=0.01
+        )
+
         if st.sidebar.button("Segment Welding Phases"):
             segments = []
             for file_path in file_paths:
@@ -100,8 +92,8 @@ def main():
                     signal = df[0]
                     file_name = os.path.basename(file_path)
 
-                    # Separate welding phases using variance-based method
-                    welding_phases = separate_welding_phases_by_variance(signal)
+                    # Separate welding phases using variance threshold
+                    welding_phases = separate_welding_phases_by_variance(signal, threshold=variance_threshold)
                     for i, phase in enumerate(welding_phases):
                         segments.append({
                             "file_name": file_name,
