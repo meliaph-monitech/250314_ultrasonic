@@ -15,24 +15,37 @@ def extract_zip(uploaded_file, extract_to="extracted_data"):
         zip_ref.extractall(extract_to)
     return [os.path.join(extract_to, f) for f in os.listdir(extract_to) if f.endswith('.csv')]
 
-# Function to automatically determine the threshold
-def determine_threshold(signal_data):
+# Function to compute rolling variance
+def compute_rolling_variance(signal_data, window_size=50):
     """
-    Automatically determines the threshold for welding phase separation
+    Computes the rolling variance of the signal data.
+    """
+    return signal_data.rolling(window=window_size, center=True).var()
+
+# Function to automatically determine the threshold for variance
+def determine_threshold_from_variance(rolling_variance):
+    """
+    Automatically determines the threshold for separating high-variance (welding) phases
     using the interquartile range (IQR) method.
     """
-    q1 = np.percentile(signal_data, 25)  # First quartile
-    q3 = np.percentile(signal_data, 75)  # Third quartile
+    q1 = np.percentile(rolling_variance.dropna(), 25)  # First quartile
+    q3 = np.percentile(rolling_variance.dropna(), 75)  # Third quartile
     iqr = q3 - q1  # Interquartile range
     return q3 + 1.5 * iqr  # Upper bound for outliers
 
-# Function to separate welding phases
-def separate_welding_phases(signal_data):
+# Function to separate welding phases using variance
+def separate_welding_phases_by_variance(signal_data, window_size=50):
     if signal_data.empty:  # Handle empty signal data
         return []
-    
-    threshold = determine_threshold(signal_data)  # Automatically determine threshold
-    welding_mask = np.abs(signal_data) > threshold
+
+    # Compute rolling variance
+    rolling_variance = compute_rolling_variance(signal_data, window_size=window_size)
+
+    # Automatically determine threshold
+    threshold = determine_threshold_from_variance(rolling_variance)
+
+    # Create a mask for high-variance regions
+    welding_mask = rolling_variance > threshold
     welding_phases = []
 
     # Identify welding phase start and end indices
@@ -87,35 +100,22 @@ def main():
                     signal = df[0]
                     file_name = os.path.basename(file_path)
 
-                    # Separate welding phases
-                    welding_phases = separate_welding_phases(signal)
+                    # Separate welding phases using variance-based method
+                    welding_phases = separate_welding_phases_by_variance(signal)
                     for i, phase in enumerate(welding_phases):
                         segments.append({
                             "file_name": file_name,
                             "phase_id": i + 1,
                             "signal": phase
                         })
-                except Exception as e:
-                    st.error(f"Error processing file {file_path}: {e}")
-                    continue
 
-            st.session_state["segments"] = segments
-            st.sidebar.success("Welding phases segmented successfully!")
-
-            # Visualization of segmentation
-            st.write("## Segmented Welding Phases Visualization")
-            for file_path in file_paths:
-                try:
-                    df = pd.read_csv(file_path, header=None)
-                    signal = df[0]
-                    file_name = os.path.basename(file_path)
-
-                    # Plot the original signal with segmented phases
+                    # Plot the original signal and rolling variance
                     plt.figure(figsize=(12, 6))
                     plt.plot(signal, label="Original Signal", color="black", alpha=0.7)
+                    rolling_variance = compute_rolling_variance(signal)
+                    plt.plot(rolling_variance, label="Rolling Variance", color="red", alpha=0.7)
 
                     # Highlight segmented welding phases
-                    welding_phases = separate_welding_phases(signal)
                     for i, phase in enumerate(welding_phases):
                         start_idx = phase.index[0]
                         end_idx = phase.index[-1]
@@ -123,12 +123,21 @@ def main():
 
                     plt.title(f"Signal Segmentation for {file_name}")
                     plt.xlabel("Time")
-                    plt.ylabel("Signal Value")
+                    plt.ylabel("Signal Value / Variance")
                     plt.legend()
                     plt.grid(True)
                     st.pyplot(plt)
+
                 except Exception as e:
-                    st.error(f"Error visualizing file {file_name}: {e}")
+                    st.error(f"Error processing file {file_path}: {e}")
+                    continue
+
+            st.session_state["segments"] = segments
+            st.sidebar.success("Welding phases segmented successfully!")
+            st.write("## Segmented Welding Phases")
+            st.write(f"Total segmented phases: {len(segments)}")
+            for segment in segments:
+                st.write(f"File: {segment['file_name']}, Phase ID: {segment['phase_id']}, Length: {len(segment['signal'])}")
 
         if "segments" in st.session_state and st.sidebar.button("Extract Features"):
             segments = st.session_state["segments"]
