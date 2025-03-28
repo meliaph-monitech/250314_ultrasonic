@@ -16,7 +16,7 @@ def extract_zip(uploaded_file, extract_to="extracted_data"):
     return [os.path.join(extract_to, f) for f in os.listdir(extract_to) if f.endswith('.csv')]
 
 # Function to compute rolling variance
-def compute_rolling_variance(signal_data, window_size=50):
+def compute_rolling_variance(signal_data, window_size=500): #Original value = 50
     """
     Computes the rolling variance of the signal data.
     """
