@@ -5,9 +5,6 @@ import os
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.cluster import KMeans
-from sklearn.ensemble import IsolationForest
-from scipy.stats import skew, kurtosis
 
 # Function to extract ZIP files
 def extract_zip(uploaded_file, extract_to="extracted_data"):
@@ -16,72 +13,30 @@ def extract_zip(uploaded_file, extract_to="extracted_data"):
         zip_ref.extractall(extract_to)
     return [os.path.join(extract_to, f) for f in os.listdir(extract_to) if f.endswith('.csv')]
 
-# Function to compute rolling variance
-def compute_rolling_variance(signal_data, window_size=50):  # Default value = 50
+# Function to segment welding phases based on amplitude threshold
+def segment_welding_phases(signal_data, amplitude_threshold):
     """
-    Computes the rolling variance of the signal data.
+    Segments the signal into welding phases based on amplitude thresholds.
     """
-    return signal_data.rolling(window=window_size, center=True).var()
+    # Compute absolute values of the signal (for symmetry around 0)
+    abs_signal = np.abs(signal_data)
 
-# Function to determine threshold using clustering
-def determine_threshold_with_clustering(rolling_variance):
-    """
-    Determines the threshold for high-variance regions using K-Means clustering.
-    """
-    rolling_variance = rolling_variance.dropna().values.reshape(-1, 1)  # Reshape for clustering
-    kmeans = KMeans(n_clusters=2, random_state=42).fit(rolling_variance)
-    cluster_centers = kmeans.cluster_centers_.flatten()
-    return max(cluster_centers)  # Use the higher cluster center as the threshold
-
-# Function to separate welding phases using variance
-def separate_welding_phases_by_clustering(signal_data, window_size=50):
-    if signal_data.empty:  # Handle empty signal data
-        return []
-
-    # Compute rolling variance
-    rolling_variance = compute_rolling_variance(signal_data, window_size=window_size)
-
-    # Determine threshold using clustering
-    threshold = determine_threshold_with_clustering(rolling_variance)
-
-    # Create a mask for high-variance regions
-    welding_mask = rolling_variance > threshold
+    # Create a mask for values above the threshold
+    welding_mask = abs_signal > amplitude_threshold
     welding_phases = []
 
-    # Identify welding phase start and end indices
+    # Identify start and end indices of welding phases
     change_points = np.where(np.diff(welding_mask.astype(int)) != 0)[0] + 1
     if welding_mask.iloc[0]:  # If signal starts in a welding phase
         change_points = np.insert(change_points, 0, 0)
     if welding_mask.iloc[-1]:  # If signal ends in a welding phase
         change_points = np.append(change_points, len(signal_data))
 
-    # Extract welding phases (only first two are considered)
+    # Extract segments corresponding to welding phases
     for i in range(0, len(change_points) - 1, 2):
-        if len(welding_phases) < 2:  # Limit to two welding phases
-            welding_phases.append(signal_data.iloc[change_points[i]:change_points[i + 1]])
-        else:
-            break
+        welding_phases.append(signal_data.iloc[change_points[i]:change_points[i + 1]])
 
     return welding_phases
-
-# Function to extract features
-def extract_features(signal):
-    n = len(signal)
-    if n == 0:
-        return [0] * 10
-
-    mean_val = np.mean(signal)
-    std_val = np.std(signal)
-    min_val = np.min(signal)
-    max_val = np.max(signal)
-    skewness = skew(signal)
-    kurt = kurtosis(signal)
-    peak_to_peak = max_val - min_val
-    energy = np.sum(signal**2)
-    rms = np.sqrt(np.mean(signal**2))
-    zero_crossing_rate = np.sum(np.diff(np.sign(signal)) != 0) / n
-
-    return [mean_val, std_val, min_val, max_val, skewness, kurt, peak_to_peak, energy, rms, zero_crossing_rate]
 
 # Main function
 def main():
@@ -92,6 +47,12 @@ def main():
         file_paths = extract_zip(uploaded_file)
         st.sidebar.write(f"Total CSV files: {len(file_paths)}")
 
+        # Slider for selecting amplitude threshold
+        amplitude_threshold = st.sidebar.slider(
+            "Set Amplitude Threshold for Welding Phase Segmentation",
+            min_value=0.0, max_value=10.0, value=1.0, step=0.1
+        )
+
         if st.sidebar.button("Segment Welding Phases"):
             segments = []
             for file_path in file_paths:
@@ -100,8 +61,8 @@ def main():
                     signal = df[0]
                     file_name = os.path.basename(file_path)
 
-                    # Separate welding phases using clustering-based method
-                    welding_phases = separate_welding_phases_by_clustering(signal)
+                    # Segment welding phases based on amplitude
+                    welding_phases = segment_welding_phases(signal_data=signal, amplitude_threshold=amplitude_threshold)
                     for i, phase in enumerate(welding_phases):
                         segments.append({
                             "file_name": file_name,
@@ -109,11 +70,9 @@ def main():
                             "signal": phase
                         })
 
-                    # Plot the original signal and rolling variance
+                    # Plot the original signal and highlight welding phases
                     plt.figure(figsize=(12, 6))
                     plt.plot(signal, label="Original Signal", color="black", alpha=0.7)
-                    rolling_variance = compute_rolling_variance(signal)
-                    plt.plot(rolling_variance, label="Rolling Variance", color="red", alpha=0.7)
 
                     # Highlight segmented welding phases
                     for i, phase in enumerate(welding_phases):
@@ -123,7 +82,7 @@ def main():
 
                     plt.title(f"Signal Segmentation for {file_name}")
                     plt.xlabel("Time")
-                    plt.ylabel("Signal Value / Variance")
+                    plt.ylabel("Signal Amplitude")
                     plt.legend()
                     plt.grid(True)
                     st.pyplot(plt)
