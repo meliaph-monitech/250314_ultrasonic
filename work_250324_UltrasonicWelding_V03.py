@@ -5,6 +5,7 @@ import os
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from sklearn.cluster import KMeans
 from sklearn.ensemble import IsolationForest
 from scipy.stats import skew, kurtosis
 
@@ -22,13 +23,26 @@ def compute_rolling_variance(signal_data, window_size=50):  # Default value = 50
     """
     return signal_data.rolling(window=window_size, center=True).var()
 
-# Function to separate welding phases using a user-defined variance threshold
-def separate_welding_phases_by_variance(signal_data, threshold, window_size=50):
+# Function to determine threshold using clustering
+def determine_threshold_with_clustering(rolling_variance):
+    """
+    Determines the threshold for high-variance regions using K-Means clustering.
+    """
+    rolling_variance = rolling_variance.dropna().values.reshape(-1, 1)  # Reshape for clustering
+    kmeans = KMeans(n_clusters=2, random_state=42).fit(rolling_variance)
+    cluster_centers = kmeans.cluster_centers_.flatten()
+    return max(cluster_centers)  # Use the higher cluster center as the threshold
+
+# Function to separate welding phases using variance
+def separate_welding_phases_by_clustering(signal_data, window_size=50):
     if signal_data.empty:  # Handle empty signal data
         return []
 
     # Compute rolling variance
     rolling_variance = compute_rolling_variance(signal_data, window_size=window_size)
+
+    # Determine threshold using clustering
+    threshold = determine_threshold_with_clustering(rolling_variance)
 
     # Create a mask for high-variance regions
     welding_mask = rolling_variance > threshold
@@ -78,12 +92,6 @@ def main():
         file_paths = extract_zip(uploaded_file)
         st.sidebar.write(f"Total CSV files: {len(file_paths)}")
 
-        # Slider for selecting variance threshold
-        variance_threshold = st.sidebar.slider(
-            "Set Variance Threshold for Welding Phase Segmentation",
-            min_value=0.0, max_value=0.1, value=0.01, step=0.001
-        )
-
         if st.sidebar.button("Segment Welding Phases"):
             segments = []
             for file_path in file_paths:
@@ -92,8 +100,8 @@ def main():
                     signal = df[0]
                     file_name = os.path.basename(file_path)
 
-                    # Separate welding phases using variance threshold
-                    welding_phases = separate_welding_phases_by_variance(signal, threshold=variance_threshold)
+                    # Separate welding phases using clustering-based method
+                    welding_phases = separate_welding_phases_by_clustering(signal)
                     for i, phase in enumerate(welding_phases):
                         segments.append({
                             "file_name": file_name,
@@ -130,61 +138,6 @@ def main():
             st.write(f"Total segmented phases: {len(segments)}")
             for segment in segments:
                 st.write(f"File: {segment['file_name']}, Phase ID: {segment['phase_id']}, Length: {len(segment['signal'])}")
-
-        if "segments" in st.session_state and st.sidebar.button("Extract Features"):
-            segments = st.session_state["segments"]
-            feature_list = []
-            for segment in segments:
-                features = extract_features(segment["signal"])
-                feature_list.append([segment["file_name"], segment["phase_id"]] + features)
-
-            feature_columns = ["file_name", "phase_id"] + [f"feature_{i}" for i in range(10)]
-            features_df = pd.DataFrame(feature_list, columns=feature_columns)
-            st.session_state["features_df"] = features_df
-            st.write("## Extracted Features")
-            st.dataframe(features_df)
-
-        if "features_df" in st.session_state and st.sidebar.button("Perform Isolation Forest"):
-            features_df = st.session_state["features_df"]
-            selected_features = features_df.iloc[:, 2:]
-
-            # Perform Isolation Forest
-            model = IsolationForest(contamination=0.05, random_state=42)
-            anomalies = model.fit_predict(selected_features)
-            features_df["anomaly"] = anomalies
-            features_df["anomaly"] = features_df["anomaly"].map({1: "normal", -1: "anomaly"})
-            st.session_state["features_df"] = features_df
-            st.sidebar.success("Anomaly detection complete!")
-
-            # Visualize results
-            st.write("## Anomaly Detection - Overlapping Line Plot")
-            plt.figure(figsize=(12, 6))
-
-            for segment in st.session_state["segments"]:
-                file_name = segment["file_name"]
-                phase_id = segment["phase_id"]
-                signal = segment["signal"]
-
-                # Get anomaly status for this segment
-                anomaly_label = st.session_state["features_df"][
-                    (st.session_state["features_df"]["file_name"] == file_name) &
-                    (st.session_state["features_df"]["phase_id"] == phase_id)
-                ]["anomaly"].values[0]
-
-                # Set color based on anomaly status
-                color = "red" if anomaly_label == "anomaly" else "blue"
-
-                # Plot the signal
-                plt.plot(signal, color=color, alpha=0.7)
-
-            # Add labels and legend
-            plt.title("Overlapping Line Plot of Welding Phases (Red = Anomaly, Blue = Normal)")
-            plt.xlabel("Time")
-            plt.ylabel("Signal Amplitude")
-            plt.grid(True)
-
-            # Display the plot
-            st.pyplot(plt)
 
 if __name__ == "__main__":
     main()
