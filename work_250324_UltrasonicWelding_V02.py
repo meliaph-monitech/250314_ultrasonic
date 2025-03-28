@@ -81,7 +81,7 @@ def main():
         # Slider for selecting variance threshold
         variance_threshold = st.sidebar.slider(
             "Set Variance Threshold for Welding Phase Segmentation",
-            min_value=0.0, max_value=1.0, value=0.01, step=0.01
+            min_value=0.0, max_value=0.1, value=0.01, step=0.001
         )
 
         if st.sidebar.button("Segment Welding Phases"):
