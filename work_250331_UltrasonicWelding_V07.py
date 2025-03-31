@@ -142,12 +142,21 @@ def main():
             st.write("## Extracted Features")
             st.dataframe(features_df)
 
+        # Input for number of clusters
+        num_clusters = st.sidebar.number_input(
+            "Number of Clusters for K-Means",
+            min_value=2,
+            max_value=10,
+            value=3,
+            step=1
+        )
+
         if "features_df" in st.session_state and st.sidebar.button("Perform K-Means Clustering"):
             features_df = st.session_state["features_df"]
             selected_features = features_df.iloc[:, 3:]
 
             # Perform K-Means clustering
-            kmeans = KMeans(n_clusters=3, random_state=42)
+            kmeans = KMeans(n_clusters=num_clusters, random_state=42)
             clusters = kmeans.fit_predict(selected_features)
             features_df["cluster"] = clusters
             st.session_state["features_df"] = features_df
@@ -169,7 +178,7 @@ def main():
                 x="pca_1",
                 y="pca_2",
                 z="pca_3",
-                color="cluster",
+                color=plot_df["cluster"].astype(str),  # Use distinct colors for clusters
                 symbol="phase_id",  # Different symbols for Phase ID
                 hover_data={
                     "file_name": True,
@@ -181,7 +190,11 @@ def main():
             )
 
             fig.update_traces(marker=dict(size=8, opacity=0.7))
-            st.plotly_chart(fig)
+            fig.update_layout(
+                height=800,  # Adjust height to match the main section
+                scene=dict(aspectmode="cube"),  # Keep aspect ratio consistent
+            )
+            st.plotly_chart(fig, use_container_width=True)
 
 if __name__ == "__main__":
     main()
