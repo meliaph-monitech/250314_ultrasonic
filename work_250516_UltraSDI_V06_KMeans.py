@@ -4,7 +4,7 @@ import streamlit as st
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-plt.rcParams.update({'font.size': 5})
+# plt.rcParams.update({'font.size': 5})
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
@@ -132,7 +132,7 @@ if uploaded_file:
         ax.set_ylabel("PC2")
         ax.set_zlabel("PC3")
         for i, label in enumerate(file_labels):
-            ax.text(X_pca[i, 0], X_pca[i, 1], X_pca[i, 2], label, fontsize=6)
+            ax.text(X_pca[i, 0], X_pca[i, 1], X_pca[i, 2], label, fontsize=4)
         st.pyplot(fig, use_container_width=False)
 
         df_features['Cluster'] = clusters
