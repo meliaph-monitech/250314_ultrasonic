@@ -61,90 +61,175 @@ if uploaded_file:
     selected_label = st.selectbox("Select a CSV file to visualize", file_labels)
     file_name = file_paths[file_labels.index(selected_label)]
 
-    if file_name:
-        raw_data = pd.read_csv(file_name, header=None, usecols=[0], encoding='latin1').squeeze("columns")
+if file_name:
+    raw_data = pd.read_csv(file_name, header=None, usecols=[0], encoding='latin1').squeeze("columns")
 
-        if raw_data.ndim > 1:
-            st.error("CSV file has more than one column. Please ensure it's a single-column signal file.")
-        else:
-            base_name = os.path.basename(file_name).replace(".csv", "").replace("_", " ")
-            st.subheader(f"Spectrogram for: {base_name}")
+    if raw_data.ndim > 1:
+        st.error("CSV file has more than one column. Please ensure it's a single-column signal file.")
+    else:
+        base_name = os.path.basename(file_name).replace(".csv", "").replace("_", " ")
+        st.subheader(f"{base_name}")
 
-            # --- Auto-cropping based on signal activity ---
-            threshold = 0.02 * np.max(np.abs(raw_data))
-            active_indices = np.where(np.abs(raw_data) > threshold)[0]
-            if len(active_indices) > 0:
-                start_idx = max(0, active_indices[0] - 1000)
-                end_idx = min(len(raw_data), active_indices[-1] + 1000)
-                raw_data = raw_data[start_idx:end_idx]
-                st.info(f"Signal auto-trimmed to region with activity: {len(raw_data)} samples")
+        # --- Auto-cropping based on signal activity ---
+        threshold = 0.02 * np.max(np.abs(raw_data))
+        active_indices = np.where(np.abs(raw_data) > threshold)[0]
+        if len(active_indices) > 0:
+            start_idx = max(0, active_indices[0] - 1000)
+            end_idx = min(len(raw_data), active_indices[-1] + 1000)
+            raw_data = raw_data[start_idx:end_idx]
+            st.info(f"Signal auto-trimmed to region with activity: {len(raw_data)} samples")
 
-            total_duration_ms = int(len(raw_data) / fs * 1000)
+        total_duration_ms = int(len(raw_data) / fs * 1000)
 
-            # --- Cropping Time Range Per File ---
-            prev_crop = st.session_state.crop_ranges.get(file_name, (0, total_duration_ms))
-            crop_start_ms, crop_end_ms = st.slider(
-                "Cropping Time Range (ms)",
-                min_value=0,
-                max_value=total_duration_ms,
-                value=prev_crop,
-                step=1
+        # --- Cropping Time Range Per File ---
+        prev_crop = st.session_state.crop_ranges.get(file_name, (0, total_duration_ms))
+        crop_start_ms, crop_end_ms = st.slider(
+            "Cropping Time Range (ms)",
+            min_value=0,
+            max_value=total_duration_ms,
+            value=prev_crop,
+            step=1
+        )
+        apply_crop = st.button("Apply Cropping")
+
+        if apply_crop:
+            st.session_state.crop_ranges[file_name] = (crop_start_ms, crop_end_ms)
+
+        crop_start_idx = int((st.session_state.crop_ranges.get(file_name, (0, total_duration_ms))[0] / 1000) * fs)
+        crop_end_idx = int((st.session_state.crop_ranges.get(file_name, (0, total_duration_ms))[1] / 1000) * fs)
+        raw_data = raw_data[crop_start_idx:crop_end_idx]
+        st.info(f"Cropping applied: {crop_end_idx - crop_start_idx} samples")
+
+        # --- Downsampling if too long ---
+        MAX_SAMPLES = 200_000
+        if len(raw_data) > MAX_SAMPLES:
+            factor = len(raw_data) // MAX_SAMPLES
+            raw_data = raw_data[::factor]
+            fs = fs // factor
+            st.warning(f"Downsampled by {factor}x to reduce memory usage.")
+
+        # --- Raw Signal Plot (appears first) ---
+        with st.expander("🔍 Raw Signal Plot", expanded=True):
+            time_axis = np.arange(len(raw_data)) / fs * 1000
+            fig2, ax2 = plt.subplots(figsize=(st.session_state.signal_width, st.session_state.signal_height))
+            ax2.plot(time_axis, raw_data, color='gray')
+            ax2.set_xlabel("Time (ms)")
+            ax2.set_ylabel("Amplitude")
+            ax2.set_title(f"{base_name}")
+            st.pyplot(fig2, use_container_width=False)
+
+        # --- Spectrogram ---
+        try:
+            noverlap = int(noverlap_ratio * nperseg)
+            nperseg = min(nperseg, len(raw_data) // 8)
+            nfft = min(nfft, 2 ** int(np.floor(np.log2(len(raw_data)))))
+
+            f_vals, t_vals, Sxx = signal.spectrogram(
+                raw_data, fs=fs, nperseg=nperseg, noverlap=noverlap, nfft=nfft, scaling='spectrum'
             )
-            apply_crop = st.button("Apply Cropping")
+            Sxx_dB = 20 * np.log10(np.abs(Sxx) + np.finfo(float).eps)
+            max_dB = np.max(Sxx_dB)
+            Sxx_dB[Sxx_dB < max_dB - db_scale] = max_dB - db_scale
 
-            if apply_crop:
-                st.session_state.crop_ranges[file_name] = (crop_start_ms, crop_end_ms)
+            fig, ax = plt.subplots(figsize=(st.session_state.spec_width, st.session_state.spec_height))
+            extent = [t_vals[0]*1000, t_vals[-1]*1000, f_vals[0]/1000, f_vals[-1]/1000]
+            im = ax.imshow(Sxx_dB, aspect='auto', extent=extent, origin='lower', cmap='jet')
+            ax.set_ylim([0, ylimit_khz])
+            ax.set_xlabel("Time (ms)")
+            ax.set_ylabel("Frequency (kHz)")
+            ax.set_title(f"{base_name}")
+            fig.colorbar(im, ax=ax, label="Intensity (dB)")
+            st.pyplot(fig, use_container_width=False)
 
-            crop_start_idx = int((st.session_state.crop_ranges.get(file_name, (0, total_duration_ms))[0] / 1000) * fs)
-            crop_end_idx = int((st.session_state.crop_ranges.get(file_name, (0, total_duration_ms))[1] / 1000) * fs)
-            raw_data = raw_data[crop_start_idx:crop_end_idx]
-            st.info(f"Cropping applied: {crop_end_idx - crop_start_idx} samples")
+        except Exception as e:
+            st.error(f"Spectrogram computation failed: {e}")
+            st.stop()
 
-            # --- Downsampling if too long ---
-            MAX_SAMPLES = 200_000
-            if len(raw_data) > MAX_SAMPLES:
-                factor = len(raw_data) // MAX_SAMPLES
-                raw_data = raw_data[::factor]
-                fs = fs // factor
-                st.warning(f"Downsampled by {factor}x to reduce memory usage.")
 
-            # --- Spectrogram ---
-            try:
-                noverlap = int(noverlap_ratio * nperseg)
-                nperseg = min(nperseg, len(raw_data) // 8)
-                nfft = min(nfft, 2 ** int(np.floor(np.log2(len(raw_data)))))
+    # if file_name:
+    #     raw_data = pd.read_csv(file_name, header=None, usecols=[0], encoding='latin1').squeeze("columns")
 
-                f_vals, t_vals, Sxx = signal.spectrogram(
-                    raw_data, fs=fs, nperseg=nperseg, noverlap=noverlap, nfft=nfft, scaling='spectrum'
-                )
-                Sxx_dB = 20 * np.log10(np.abs(Sxx) + np.finfo(float).eps)
-                max_dB = np.max(Sxx_dB)
-                Sxx_dB[Sxx_dB < max_dB - db_scale] = max_dB - db_scale
+    #     if raw_data.ndim > 1:
+    #         st.error("CSV file has more than one column. Please ensure it's a single-column signal file.")
+    #     else:
+    #         base_name = os.path.basename(file_name).replace(".csv", "").replace("_", " ")
+    #         st.subheader(f"Spectrogram for: {base_name}")
 
-                fig, ax = plt.subplots(figsize=(st.session_state.spec_width, st.session_state.spec_height))
-                extent = [t_vals[0]*1000, t_vals[-1]*1000, f_vals[0]/1000, f_vals[-1]/1000]
-                im = ax.imshow(Sxx_dB, aspect='auto', extent=extent, origin='lower', cmap='jet')
-                ax.set_ylim([0, ylimit_khz])
-                ax.set_xlabel("Time (ms)")
-                ax.set_ylabel("Frequency (kHz)")
-                # ax.set_title(f"Spectrogram - {base_name}")
-                ax.set_title(f"{base_name}")
-                fig.colorbar(im, ax=ax, label="Intensity (dB)")
-                st.pyplot(fig, use_container_width=False)
+    #         # --- Auto-cropping based on signal activity ---
+    #         threshold = 0.02 * np.max(np.abs(raw_data))
+    #         active_indices = np.where(np.abs(raw_data) > threshold)[0]
+    #         if len(active_indices) > 0:
+    #             start_idx = max(0, active_indices[0] - 1000)
+    #             end_idx = min(len(raw_data), active_indices[-1] + 1000)
+    #             raw_data = raw_data[start_idx:end_idx]
+    #             st.info(f"Signal auto-trimmed to region with activity: {len(raw_data)} samples")
 
-            except Exception as e:
-                st.error(f"Spectrogram computation failed: {e}")
-                st.stop()
+    #         total_duration_ms = int(len(raw_data) / fs * 1000)
 
-            # --- Raw Signal Plot ---
-            with st.expander("Raw Signal Plot"):
-                time_axis = np.arange(len(raw_data)) / fs * 1000
-                fig2, ax2 = plt.subplots(figsize=(st.session_state.signal_width, st.session_state.signal_height))
-                ax2.plot(time_axis, raw_data, color='gray')
-                ax2.set_xlabel("Time (ms)")
-                ax2.set_ylabel("Amplitude")
-                # ax2.set_title(f"Raw Signal - {base_name}")
-                ax2.set_title(f"{base_name}")
-                st.pyplot(fig2, use_container_width=False)
+    #         # --- Cropping Time Range Per File ---
+    #         prev_crop = st.session_state.crop_ranges.get(file_name, (0, total_duration_ms))
+    #         crop_start_ms, crop_end_ms = st.slider(
+    #             "Cropping Time Range (ms)",
+    #             min_value=0,
+    #             max_value=total_duration_ms,
+    #             value=prev_crop,
+    #             step=1
+    #         )
+    #         apply_crop = st.button("Apply Cropping")
+
+    #         if apply_crop:
+    #             st.session_state.crop_ranges[file_name] = (crop_start_ms, crop_end_ms)
+
+    #         crop_start_idx = int((st.session_state.crop_ranges.get(file_name, (0, total_duration_ms))[0] / 1000) * fs)
+    #         crop_end_idx = int((st.session_state.crop_ranges.get(file_name, (0, total_duration_ms))[1] / 1000) * fs)
+    #         raw_data = raw_data[crop_start_idx:crop_end_idx]
+    #         st.info(f"Cropping applied: {crop_end_idx - crop_start_idx} samples")
+
+    #         # --- Downsampling if too long ---
+    #         MAX_SAMPLES = 200_000
+    #         if len(raw_data) > MAX_SAMPLES:
+    #             factor = len(raw_data) // MAX_SAMPLES
+    #             raw_data = raw_data[::factor]
+    #             fs = fs // factor
+    #             st.warning(f"Downsampled by {factor}x to reduce memory usage.")
+
+    #         # --- Spectrogram ---
+    #         try:
+    #             noverlap = int(noverlap_ratio * nperseg)
+    #             nperseg = min(nperseg, len(raw_data) // 8)
+    #             nfft = min(nfft, 2 ** int(np.floor(np.log2(len(raw_data)))))
+
+    #             f_vals, t_vals, Sxx = signal.spectrogram(
+    #                 raw_data, fs=fs, nperseg=nperseg, noverlap=noverlap, nfft=nfft, scaling='spectrum'
+    #             )
+    #             Sxx_dB = 20 * np.log10(np.abs(Sxx) + np.finfo(float).eps)
+    #             max_dB = np.max(Sxx_dB)
+    #             Sxx_dB[Sxx_dB < max_dB - db_scale] = max_dB - db_scale
+
+    #             fig, ax = plt.subplots(figsize=(st.session_state.spec_width, st.session_state.spec_height))
+    #             extent = [t_vals[0]*1000, t_vals[-1]*1000, f_vals[0]/1000, f_vals[-1]/1000]
+    #             im = ax.imshow(Sxx_dB, aspect='auto', extent=extent, origin='lower', cmap='jet')
+    #             ax.set_ylim([0, ylimit_khz])
+    #             ax.set_xlabel("Time (ms)")
+    #             ax.set_ylabel("Frequency (kHz)")
+    #             # ax.set_title(f"Spectrogram - {base_name}")
+    #             ax.set_title(f"{base_name}")
+    #             fig.colorbar(im, ax=ax, label="Intensity (dB)")
+    #             st.pyplot(fig, use_container_width=False)
+
+    #         except Exception as e:
+    #             st.error(f"Spectrogram computation failed: {e}")
+    #             st.stop()
+
+    #         # --- Raw Signal Plot ---
+    #         with st.expander("Raw Signal Plot"):
+    #             time_axis = np.arange(len(raw_data)) / fs * 1000
+    #             fig2, ax2 = plt.subplots(figsize=(st.session_state.signal_width, st.session_state.signal_height))
+    #             ax2.plot(time_axis, raw_data, color='gray')
+    #             ax2.set_xlabel("Time (ms)")
+    #             ax2.set_ylabel("Amplitude")
+    #             # ax2.set_title(f"Raw Signal - {base_name}")
+    #             ax2.set_title(f"{base_name}")
+    #             st.pyplot(fig2, use_container_width=False)
 else:
     st.info("Please upload a ZIP file containing 1-column CSV signal files.")
