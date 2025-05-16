@@ -50,6 +50,8 @@ if uploaded_file:
             st.error("CSV file has more than one column. Please ensure it's a single-column signal file.")
         else:
             st.subheader(f"Spectrogram for: {os.path.basename(file_name)}")
+            base_name = os.path.basename(file_name).replace(".csv", "").replace("_", " ")
+
 
             # --- Auto-cropping based on signal activity ---
             threshold = 0.02 * np.max(np.abs(raw_data))
@@ -110,6 +112,7 @@ if uploaded_file:
                 # ax.set_xlabel("Time (s)")
                 ax.set_xlabel("Time (ms)")
                 ax.set_ylabel("Frequency (kHz)")
+                ax.set_title(f"Spectrogram - {base_name}", fontsize=10)
                 fig.colorbar(im, ax=ax, label="Intensity (dB)")
                 st.pyplot(fig)
             except Exception as e:
@@ -125,6 +128,8 @@ if uploaded_file:
                 # ax2.set_xlabel("Time (s)")
                 ax2.set_xlabel("Time (ms)")
                 ax2.set_ylabel("Amplitude")
+                ax2.set_title(f"Raw Signal - {base_name}", fontsize=10)
+
                 st.pyplot(fig2)
 else:
     st.info("Please upload a ZIP file containing 1-column CSV signal files.")
