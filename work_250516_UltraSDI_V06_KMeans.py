@@ -143,7 +143,15 @@ if uploaded_file:
             scatter = ax.scatter(X_pca[:, 0], X_pca[:, 1], X_pca[:, 2], c=labels, cmap='coolwarm', s=60)
     
             for i, fname in enumerate(filenames_used):
-                ax.text(X_pca[i, 0], X_pca[i, 1], X_pca[i, 2], fname[:8], fontsize=6)
+                try:
+                    parts = fname.split('_')
+                    time_str = parts[1]
+                    description = parts[3].replace(".csv", "")
+                    label = f"{time_str}_{description}"
+                except Exception:
+                    label = fname  # fallback if unexpected format
+                
+                ax.text(X_pca[i, 0], X_pca[i, 1], X_pca[i, 2], label, fontsize=6)
     
             ax.set_xlabel("PCA 1")
             ax.set_ylabel("PCA 2")
