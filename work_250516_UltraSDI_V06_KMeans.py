@@ -126,7 +126,7 @@ if uploaded_file:
 
         fig = plt.figure(figsize=(8, 5))
         ax = fig.add_subplot(111, projection='3d')
-        scatter = ax.scatter(X_pca[:, 0], X_pca[:, 1], X_pca[:, 2], c=clusters, cmap='Set1', s=60)
+        scatter = ax.scatter(X_pca[:, 0], X_pca[:, 1], X_pca[:, 2], c=clusters, cmap='rainbow', s=60)
         ax.set_title("3D PCA Clustering")
         ax.set_xlabel("PC1")
         ax.set_ylabel("PC2")
