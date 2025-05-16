@@ -81,6 +81,13 @@ with st.sidebar:
     st.session_state.signal_height = st.slider("Signal Plot Height", 1.0, 10.0, st.session_state.signal_height, step=0.1)
     st.session_state.spec_width = st.slider("Spectrogram Width", 1.0, 10.0, st.session_state.spec_width, step=0.1)
     st.session_state.spec_height = st.slider("Spectrogram Height", 1.0, 10.0, st.session_state.spec_height, step=0.1)
+    st.markdown("### Feature Selection for Clustering")
+    available_features = [
+        "mean", "std", "rms", "max", "min",
+        "peak_to_peak", "crest_factor", "skewness", "kurtosis",
+        "dominant_freq", "bandwidth", "spectral_entropy"
+    ]
+    selected_features = st.multiselect("Select features to use", available_features, default=available_features)
 
 
 # --- Main Logic ---
