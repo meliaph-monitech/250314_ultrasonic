@@ -29,7 +29,7 @@ with st.sidebar:
     noverlap_ratio = st.slider("Overlap Ratio", min_value=0.0, max_value=0.99, value=0.9)
     nfft = st.number_input("nfft", min_value=256, max_value=16384, value=2048)
     db_scale = st.number_input("dB Dynamic Range", min_value=20, max_value=500, value=250)
-    ylimit = st.number_input("Max Frequency Display (Hz)", min_value=1000, max_value=int(fs / 2), value=10000)
+    ylimit_khz = st.number_input("Max Frequency Display (kHz)", min_value=1, max_value=int(fs / 2000), value=10)
 
 # --- Main Logic ---
 if uploaded_file:
@@ -57,6 +57,26 @@ if uploaded_file:
                 raw_data = raw_data[start_idx:end_idx]
                 st.info(f"Signal auto-trimmed to region with activity: {len(raw_data)} samples")
 
+            total_duration_ms = int(len(raw_data) / fs * 1000)
+
+            # --- Sidebar cropping control ---
+            with st.sidebar:
+                st.markdown("### Cropping Time Range (ms)")
+                crop_start_ms, crop_end_ms = st.slider(
+                    "Select time range (ms)",
+                    min_value=0,
+                    max_value=total_duration_ms,
+                    value=(0, total_duration_ms),
+                    step=1
+                )
+                do_crop = st.button("Revisualize")
+
+            if do_crop:
+                crop_start_idx = int((crop_start_ms / 1000) * fs)
+                crop_end_idx = int((crop_end_ms / 1000) * fs)
+                raw_data = raw_data[crop_start_idx:crop_end_idx]
+                st.info(f"Cropping applied: {crop_end_ms - crop_start_ms} ms window.")
+
             # --- Downsampling if too long ---
             MAX_SAMPLES = 100_000
             if len(raw_data) > MAX_SAMPLES:
@@ -79,11 +99,11 @@ if uploaded_file:
                 Sxx_dB[Sxx_dB < max_dB - db_scale] = max_dB - db_scale
 
                 fig, ax = plt.subplots(figsize=(8, 3))
-                extent = [t_vals[0], t_vals[-1], f_vals[0], f_vals[-1]]
+                extent = [t_vals[0], t_vals[-1], f_vals[0] / 1000, f_vals[-1] / 1000]  # kHz
                 im = ax.imshow(Sxx_dB, aspect='auto', extent=extent, origin='lower', cmap='jet')
-                ax.set_ylim([0, ylimit])
+                ax.set_ylim([0, ylimit_khz])
                 ax.set_xlabel("Time (s)")
-                ax.set_ylabel("Frequency (Hz)")
+                ax.set_ylabel("Frequency (kHz)")
                 fig.colorbar(im, ax=ax, label="Intensity (dB)")
                 st.pyplot(fig)
             except Exception as e:
