@@ -24,7 +24,7 @@ def extract_zip(zip_path, extract_dir="ultrasonic_csvs"):
 # --- Sidebar: Upload & Parameters ---
 with st.sidebar:
     uploaded_file = st.file_uploader("Upload ZIP of CSVs (1-column ultrasonic data)", type="zip")
-    fs = st.number_input("Sampling Frequency (Hz)", min_value=1000, max_value=100000, value=40000)
+    fs = st.number_input("Sampling Frequency (Hz)", min_value=1000, max_value=100000, value=500000)
     nperseg = st.number_input("nperseg", min_value=64, max_value=8192, value=1024)
     noverlap_ratio = st.slider("Overlap Ratio", min_value=0.0, max_value=0.99, value=0.9)
     nfft = st.number_input("nfft", min_value=256, max_value=16384, value=2048)
