@@ -1,37 +1,21 @@
+# Modified Streamlit App: Signal Processing, Feature Extraction, KMeans Clustering with 3D PCA
+
 import streamlit as st
 import numpy as np
 import pandas as pd
-import os
-import zipfile
-from scipy import signal
-from scipy.stats import skew, kurtosis
-from sklearn.cluster import KMeans
-from sklearn.decomposition import PCA
-from sklearn.preprocessing import StandardScaler
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
+from sklearn.decomposition import PCA
+from sklearn.cluster import KMeans
+from sklearn.preprocessing import StandardScaler
+from scipy import signal, stats
+import zipfile
+import os
+import itertools
 
-# --- Streamlit config ---
 st.set_page_config(layout="wide")
-st.title("Ultrasonic Signal Clustering with PCA")
+st.title("Ultrasonic Signal Feature Clustering")
 
-# --- Sidebar Parameters ---
-with st.sidebar:
-    uploaded_file = st.file_uploader("Upload ZIP of 1-column CSVs", type="zip")
-    
-    fs = st.number_input("Sampling Frequency (Hz)", min_value=1000, max_value=500000, value=500000)
-    
-    st.markdown("### Select Features for Clustering")
-    available_features = [
-        "mean", "std", "max", "min", "rms",
-        "skewness", "kurtosis", "crest_factor",
-        "spectral_centroid", "spectral_bandwidth", "spectral_entropy"
-    ]
-    selected_features = st.multiselect("Features", available_features, default=available_features)
-    
-    run_cluster = st.button("Run Clustering")
-
-# --- Utility Functions ---
+# --- Extract ZIP ---
 def extract_zip(zip_path, extract_dir="ultrasonic_csvs"):
     if os.path.exists(extract_dir):
         for file in os.listdir(extract_dir):
@@ -40,93 +24,94 @@ def extract_zip(zip_path, extract_dir="ultrasonic_csvs"):
         os.makedirs(extract_dir)
     with zipfile.ZipFile(zip_path, 'r') as zip_ref:
         zip_ref.extractall(extract_dir)
-    return [os.path.join(extract_dir, f) for f in os.listdir(extract_dir) if f.endswith(".csv")]
+    return [os.path.join(extract_dir, f) for f in os.listdir(extract_dir) if f.endswith('.csv')]
 
-def compute_features(signal_data, fs):
+# --- Auto-cropping ---
+def auto_crop(data):
+    threshold = 0.02 * np.max(np.abs(data))
+    active_indices = np.where(np.abs(data) > threshold)[0]
+    if len(active_indices) == 0:
+        return data
+    start_idx = max(0, active_indices[0] - 1000)
+    end_idx = min(len(data), active_indices[-1] + 1000)
+    return data[start_idx:end_idx]
+
+# --- Feature Extraction ---
+def extract_features(data, fs):
     features = {}
-    signal_data = signal_data - np.mean(signal_data)
 
-    # Time-domain
-    features["mean"] = np.mean(signal_data)
-    features["std"] = np.std(signal_data)
-    features["max"] = np.max(signal_data)
-    features["min"] = np.min(signal_data)
-    features["rms"] = np.sqrt(np.mean(signal_data**2))
-    features["skewness"] = skew(signal_data)
-    features["kurtosis"] = kurtosis(signal_data)
-    features["crest_factor"] = np.max(np.abs(signal_data)) / (features["rms"] + 1e-6)
+    # Time-domain features
+    features['mean'] = np.mean(data)
+    features['std'] = np.std(data)
+    features['var'] = np.var(data)
+    features['rms'] = np.sqrt(np.mean(data**2))
+    features['skewness'] = stats.skew(data)
+    features['kurtosis'] = stats.kurtosis(data)
+    features['peak'] = np.max(np.abs(data))
+    features['crest_factor'] = features['peak'] / features['rms'] if features['rms'] != 0 else 0
+    features['impulse_factor'] = features['peak'] / (np.mean(np.abs(data)) + 1e-12)
+    features['shape_factor'] = features['rms'] / (np.mean(np.abs(data)) + 1e-12)
 
-    # Frequency-domain
-    freqs, psd = signal.welch(signal_data, fs=fs)
-    psd_norm = psd / (np.sum(psd) + 1e-10)
-    features["spectral_centroid"] = np.sum(freqs * psd_norm)
-    features["spectral_bandwidth"] = np.sqrt(np.sum(((freqs - features["spectral_centroid"]) ** 2) * psd_norm))
-    features["spectral_entropy"] = -np.sum(psd_norm * np.log(psd_norm + 1e-10)) / np.log(len(psd_norm))
+    # Frequency-domain features
+    freqs, psd = signal.welch(data, fs=fs)
+    features['spectral_centroid'] = np.sum(freqs * psd) / (np.sum(psd) + 1e-12)
+    features['spectral_entropy'] = -np.sum((psd / np.sum(psd)) * np.log2(psd / np.sum(psd) + 1e-12))
+    features['spectral_flatness'] = stats.gmean(psd + 1e-12) / (np.mean(psd) + 1e-12)
+    features['spectral_rolloff'] = freqs[np.where(np.cumsum(psd) >= 0.85 * np.sum(psd))[0][0]]
 
     return features
 
-# --- Main Clustering Logic ---
-if uploaded_file and run_cluster:
-    with open("temp.zip", "wb") as f:
+# --- Sidebar ---
+with st.sidebar:
+    uploaded_file = st.file_uploader("Upload ZIP of CSVs", type="zip")
+    fs = st.number_input("Sampling Frequency (Hz)", min_value=1000, max_value=1000000, value=500000)
+    n_clusters = st.number_input("Number of Clusters (K)", min_value=2, max_value=20, value=3)
+
+# --- Main Logic ---
+if uploaded_file:
+    with open("temp_upload.zip", "wb") as f:
         f.write(uploaded_file.getbuffer())
-    
-    file_paths = extract_zip("temp.zip")
+
+    file_paths = extract_zip("temp_upload.zip")
     all_features = []
-    labels = []
-    
-    for path in file_paths:
-        try:
-            data = pd.read_csv(path, header=None).squeeze("columns")
-            if data.ndim != 1:
-                continue
+    file_labels = []
 
-            # Auto-trim signal
-            threshold = 0.02 * np.max(np.abs(data))
-            active_idx = np.where(np.abs(data) > threshold)[0]
-            if len(active_idx) > 0:
-                data = data[max(0, active_idx[0] - 1000): min(len(data), active_idx[-1] + 1000)]
-            else:
-                continue
+    for file in file_paths:
+        data = pd.read_csv(file, header=None).squeeze("columns")
+        if data.ndim > 1:
+            continue
 
-            features = compute_features(data, fs)
-            selected_vector = [features[f] for f in selected_features if f in features]
-            all_features.append(selected_vector)
-            labels.append(os.path.basename(path))
+        cropped = auto_crop(data.values)
+        features = extract_features(cropped, fs)
+        all_features.append(features)
+        file_labels.append(os.path.basename(file))
 
-        except Exception as e:
-            st.warning(f"Skipping file {path}: {e}")
+    df_features = pd.DataFrame(all_features, index=file_labels)
+    st.subheader("Extracted Features")
+    selected_features = st.multiselect("Select features to use for clustering", df_features.columns.tolist(), default=df_features.columns.tolist())
 
-    if len(all_features) >= 3:
-        X = np.array(all_features)
+    if selected_features:
+        X = df_features[selected_features].values
         X_scaled = StandardScaler().fit_transform(X)
+
+        kmeans = KMeans(n_clusters=n_clusters, random_state=42)
+        clusters = kmeans.fit_predict(X_scaled)
+
         pca = PCA(n_components=3)
         X_pca = pca.fit_transform(X_scaled)
-        kmeans = KMeans(n_clusters=4, random_state=0, n_init="auto")
-        y_kmeans = kmeans.fit_predict(X_pca)
 
-        # Plot 3D PCA
-        fig = plt.figure(figsize=(8, 6))
+        fig = plt.figure(figsize=(10, 6))
         ax = fig.add_subplot(111, projection='3d')
-        scatter = ax.scatter(X_pca[:, 0], X_pca[:, 1], X_pca[:, 2], c=y_kmeans, cmap='tab10', s=60)
-
-        for i, label in enumerate(labels):
-            try:
-                parts = label.split("_")
-                time_str = parts[1]
-                desc = parts[3].replace(".csv", "")
-                tag = f"{time_str}_{desc}"
-            except Exception:
-                tag = label
-            ax.text(X_pca[i, 0], X_pca[i, 1], X_pca[i, 2], tag, fontsize=6)
-
-        ax.set_xlabel("PCA 1")
-        ax.set_ylabel("PCA 2")
-        ax.set_zlabel("PCA 3")
-        ax.set_title("K-Means Clustering (3D PCA)")
+        scatter = ax.scatter(X_pca[:, 0], X_pca[:, 1], X_pca[:, 2], c=clusters, cmap='Set1', s=60)
+        ax.set_title("3D PCA Clustering")
+        ax.set_xlabel("PC1")
+        ax.set_ylabel("PC2")
+        ax.set_zlabel("PC3")
+        for i, label in enumerate(file_labels):
+            ax.text(X_pca[i, 0], X_pca[i, 1], X_pca[i, 2], label, fontsize=6)
         st.pyplot(fig)
-    else:
-        st.warning("Not enough valid signals to cluster (minimum 3).")
-elif uploaded_file and not run_cluster:
-    st.info("Upload complete. Click 'Run Clustering' to begin.")
+
+        df_features['Cluster'] = clusters
+        st.dataframe(df_features)
 else:
-    st.info("Please upload a ZIP file containing 1-column CSV files.")
+    st.info("Please upload a ZIP file of single-column CSV files for processing.")
