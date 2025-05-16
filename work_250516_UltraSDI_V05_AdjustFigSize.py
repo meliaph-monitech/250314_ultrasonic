@@ -10,6 +10,18 @@ import os
 st.set_page_config(layout="wide")
 st.title("Ultrasonic Welding Signal Spectrogram Viewer")
 
+# --- Session state for persistent parameters ---
+if "spec_width" not in st.session_state:
+    st.session_state.spec_width = 10.0
+if "spec_height" not in st.session_state:
+    st.session_state.spec_height = 3.0
+if "signal_width" not in st.session_state:
+    st.session_state.signal_width = 10.0
+if "signal_height" not in st.session_state:
+    st.session_state.signal_height = 1.5
+if "crop_ranges" not in st.session_state:
+    st.session_state.crop_ranges = {}
+
 # --- Function to extract ZIP ---
 def extract_zip(zip_path, extract_dir="ultrasonic_csvs"):
     if os.path.exists(extract_dir):
@@ -32,6 +44,11 @@ with st.sidebar:
     nfft = st.number_input("nfft", min_value=256, max_value=16384, value=2048)
     db_scale = st.number_input("dB Dynamic Range", min_value=20, max_value=500, value=250)
     ylimit_khz = st.number_input("Max Frequency Display (kHz)", min_value=1, max_value=int(fs / 2000), value=250)
+    st.markdown("### Plot Dimensions")
+    st.session_state.spec_width = st.slider("Spectrogram Width", 1.0, 20.0, st.session_state.spec_width, step=0.5)
+    st.session_state.spec_height = st.slider("Spectrogram Height", 1.0, 20.0, st.session_state.spec_height, step=0.5)
+    st.session_state.signal_width = st.slider("Signal Plot Width", 1.0, 20.0, st.session_state.signal_width, step=0.5)
+    st.session_state.signal_height = st.slider("Signal Plot Height", 1.0, 20.0, st.session_state.signal_height, step=0.5)
 
 # --- Main Logic ---
 if uploaded_file:
@@ -64,29 +81,24 @@ if uploaded_file:
 
             total_duration_ms = int(len(raw_data) / fs * 1000)
 
-            # --- Sidebar Cropping + Plot Dimension Controls ---
-            with st.sidebar:
-                st.markdown("### Cropping Time Range (ms)")
-                crop_start_ms, crop_end_ms = st.slider(
-                    "Select time range (ms)",
-                    min_value=0,
-                    max_value=total_duration_ms,
-                    value=(0, total_duration_ms),
-                    step=1
-                )
-                st.markdown("### Plot Dimensions")
-                spec_width = st.slider("Spectrogram Width", min_value=1.0, max_value=20.0, value=10.0, step=0.5)
-                spec_height = st.slider("Spectrogram Height", min_value=1.0, max_value=20.0, value=3.0, step=0.5)
-                signal_width = st.slider("Signal Plot Width", min_value=1.0, max_value=20.0, value=10.0, step=0.5)
-                signal_height = st.slider("Signal Plot Height", min_value=1.0, max_value=20.0, value=1.5, step=0.5)
-                do_crop = st.button("Revisualize")
+            # --- Cropping Time Range Per File ---
+            prev_crop = st.session_state.crop_ranges.get(file_name, (0, total_duration_ms))
+            crop_start_ms, crop_end_ms = st.slider(
+                "Cropping Time Range (ms)",
+                min_value=0,
+                max_value=total_duration_ms,
+                value=prev_crop,
+                step=1
+            )
+            apply_crop = st.button("Apply Cropping")
 
-            # --- Optional Cropping ---
-            if do_crop:
-                crop_start_idx = int((crop_start_ms / 1000) * fs)
-                crop_end_idx = int((crop_end_ms / 1000) * fs)
-                raw_data = raw_data[crop_start_idx:crop_end_idx]
-                st.info(f"Cropping applied: {crop_end_ms - crop_start_ms} ms window.")
+            if apply_crop:
+                st.session_state.crop_ranges[file_name] = (crop_start_ms, crop_end_ms)
+
+            crop_start_idx = int((st.session_state.crop_ranges.get(file_name, (0, total_duration_ms))[0] / 1000) * fs)
+            crop_end_idx = int((st.session_state.crop_ranges.get(file_name, (0, total_duration_ms))[1] / 1000) * fs)
+            raw_data = raw_data[crop_start_idx:crop_end_idx]
+            st.info(f"Cropping applied: {crop_end_idx - crop_start_idx} samples")
 
             # --- Downsampling if too long ---
             MAX_SAMPLES = 200_000
@@ -97,11 +109,11 @@ if uploaded_file:
                 st.warning(f"Downsampled by {factor}x to reduce memory usage.")
 
             # --- Spectrogram ---
-            noverlap = int(noverlap_ratio * nperseg)
-            nperseg = min(nperseg, len(raw_data) // 8)
-            nfft = min(nfft, 2 ** int(np.floor(np.log2(len(raw_data)))))
-
             try:
+                noverlap = int(noverlap_ratio * nperseg)
+                nperseg = min(nperseg, len(raw_data) // 8)
+                nfft = min(nfft, 2 ** int(np.floor(np.log2(len(raw_data)))))
+
                 f_vals, t_vals, Sxx = signal.spectrogram(
                     raw_data, fs=fs, nperseg=nperseg, noverlap=noverlap, nfft=nfft, scaling='spectrum'
                 )
@@ -109,8 +121,7 @@ if uploaded_file:
                 max_dB = np.max(Sxx_dB)
                 Sxx_dB[Sxx_dB < max_dB - db_scale] = max_dB - db_scale
 
-                # Use dynamic or default figure size
-                fig, ax = plt.subplots(figsize=(spec_width if do_crop else 8, spec_height if do_crop else 3))
+                fig, ax = plt.subplots(figsize=(st.session_state.spec_width, st.session_state.spec_height))
                 extent = [t_vals[0]*1000, t_vals[-1]*1000, f_vals[0]/1000, f_vals[-1]/1000]
                 im = ax.imshow(Sxx_dB, aspect='auto', extent=extent, origin='lower', cmap='jet')
                 ax.set_ylim([0, ylimit_khz])
@@ -127,12 +138,11 @@ if uploaded_file:
             # --- Raw Signal Plot ---
             with st.expander("Raw Signal Plot"):
                 time_axis = np.arange(len(raw_data)) / fs * 1000
-                fig2, ax2 = plt.subplots(figsize=(signal_width if do_crop else 10, signal_height if do_crop else 1.5))
+                fig2, ax2 = plt.subplots(figsize=(st.session_state.signal_width, st.session_state.signal_height))
                 ax2.plot(time_axis, raw_data, color='gray')
                 ax2.set_xlabel("Time (ms)")
                 ax2.set_ylabel("Amplitude")
                 ax2.set_title(f"Raw Signal - {base_name}")
                 st.pyplot(fig2, use_container_width=False)
-
 else:
     st.info("Please upload a ZIP file containing 1-column CSV signal files.")
