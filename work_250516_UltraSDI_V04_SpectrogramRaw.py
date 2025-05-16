@@ -104,7 +104,7 @@ if uploaded_file:
                 max_dB = np.max(Sxx_dB)
                 Sxx_dB[Sxx_dB < max_dB - db_scale] = max_dB - db_scale
 
-                fig, ax = plt.subplots(figsize=(4, 8))
+                fig, ax = plt.subplots(figsize=(10, 3))
                 # extent = [t_vals[0], t_vals[-1], f_vals[0] / 1000, f_vals[-1] / 1000]  # kHz
                 extent = [t_vals[0] * 1000, t_vals[-1] * 1000, f_vals[0] / 1000, f_vals[-1] / 1000]  # Time in ms, Frequency in kHz
                 
