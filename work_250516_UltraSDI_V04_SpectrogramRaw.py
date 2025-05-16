@@ -99,10 +99,13 @@ if uploaded_file:
                 Sxx_dB[Sxx_dB < max_dB - db_scale] = max_dB - db_scale
 
                 fig, ax = plt.subplots(figsize=(8, 3))
-                extent = [t_vals[0], t_vals[-1], f_vals[0] / 1000, f_vals[-1] / 1000]  # kHz
+                # extent = [t_vals[0], t_vals[-1], f_vals[0] / 1000, f_vals[-1] / 1000]  # kHz
+                extent = [t_vals[0] * 1000, t_vals[-1] * 1000, f_vals[0] / 1000, f_vals[-1] / 1000]  # Time in ms, Frequency in kHz
+                
                 im = ax.imshow(Sxx_dB, aspect='auto', extent=extent, origin='lower', cmap='jet')
                 ax.set_ylim([0, ylimit_khz])
-                ax.set_xlabel("Time (s)")
+                # ax.set_xlabel("Time (s)")
+                ax.set_xlabel("Time (ms)")
                 ax.set_ylabel("Frequency (kHz)")
                 fig.colorbar(im, ax=ax, label="Intensity (dB)")
                 st.pyplot(fig)
@@ -112,9 +115,12 @@ if uploaded_file:
 
             with st.expander("Raw Signal Plot"):
                 fig2, ax2 = plt.subplots(figsize=(10, 2))
+                # time_axis = np.arange(len(raw_data)) / fs
                 time_axis = np.arange(len(raw_data)) / fs
+                
                 ax2.plot(time_axis, raw_data, color='gray')
-                ax2.set_xlabel("Time (s)")
+                # ax2.set_xlabel("Time (s)")
+                ax2.set_xlabel("Time (ms)")
                 ax2.set_ylabel("Amplitude")
                 st.pyplot(fig2)
 else:
