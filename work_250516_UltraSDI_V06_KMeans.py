@@ -77,17 +77,32 @@ if uploaded_file:
     file_labels = []
 
     for file in file_paths:
-        data = pd.read_csv(file, header=None).squeeze("columns")
-        if data.ndim > 1:
-            continue
+        try:
+            data = pd.read_csv(file, header=None).squeeze("columns")
+            if data.ndim > 1:
+                st.warning(f"Skipping {file}: More than one column.")
+                continue
 
-        cropped = auto_crop(data.values)
-        features = extract_features(cropped, fs)
-        all_features.append(features)
-        file_labels.append(os.path.basename(file))
+            cropped = auto_crop(data.values)
+            if len(cropped) < 10:
+                st.warning(f"Skipping {file}: Too short after cropping.")
+                continue
+
+            features = extract_features(cropped, fs)
+            all_features.append(features)
+            file_labels.append(os.path.basename(file))
+        except Exception as e:
+            st.error(f"Error processing {file}: {e}")
 
     df_features = pd.DataFrame(all_features, index=file_labels)
-    st.subheader("Extracted Features")
+
+    if df_features.empty:
+        st.error("No features extracted. Check input data or preprocessing steps.")
+        st.stop()
+
+    st.subheader("Extracted Features (Raw)")
+    st.write(df_features)
+
     selected_features = st.multiselect("Select features to use for clustering", df_features.columns.tolist(), default=df_features.columns.tolist())
 
     if selected_features:
