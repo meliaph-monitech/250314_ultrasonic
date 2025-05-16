@@ -38,7 +38,10 @@ if uploaded_file:
     file_paths = extract_zip("temp_ultrasonic.zip")
     st.success(f"Extracted {len(file_paths)} CSV files")
 
-    file_name = st.selectbox("Select a CSV file to visualize", file_paths)
+    # file_name = st.selectbox("Select a CSV file to visualize", file_paths)
+    file_labels = [os.path.basename(f) for f in file_paths]
+    selected_label = st.selectbox("Select a CSV file to visualize", file_labels)
+    file_name = file_paths[file_labels.index(selected_label)]
 
     if file_name:
         raw_data = pd.read_csv(file_name, header=None, usecols=[0], encoding='latin1').squeeze("columns")
@@ -116,7 +119,7 @@ if uploaded_file:
             with st.expander("Raw Signal Plot"):
                 fig2, ax2 = plt.subplots(figsize=(10, 2))
                 # time_axis = np.arange(len(raw_data)) / fs
-                time_axis = np.arange(len(raw_data)) / fs
+                time_axis = np.arange(len(raw_data)) / fs * 1000
                 
                 ax2.plot(time_axis, raw_data, color='gray')
                 # ax2.set_xlabel("Time (s)")
