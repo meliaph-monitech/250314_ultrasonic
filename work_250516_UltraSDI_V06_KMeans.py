@@ -212,31 +212,31 @@ with st.expander("📊 Feature-Based Clustering Across All Signals", expanded=Tr
         except Exception as e:
             st.warning(f"Could not process file {os.path.basename(path)}: {e}")
 
-    if len(feature_list) >= 3:
-        features = np.array(feature_list)
-        scaler = StandardScaler()
-        features_scaled = scaler.fit_transform(features)
-
-        pca = PCA(n_components=3)
-        features_pca = pca.fit_transform(features_scaled)
-
-        kmeans = KMeans(n_clusters=2, random_state=0)
-        labels = kmeans.fit_predict(features_pca)
-
-        # 3D Visualization
-        fig = plt.figure(figsize=(7, 5))
-        ax = fig.add_subplot(111, projection='3d')
-        scatter = ax.scatter(features_pca[:, 0], features_pca[:, 1], features_pca[:, 2],
-                             c=labels, cmap='viridis', s=50)
-        for i, label in enumerate(filenames_used):
-            ax.text(features_pca[i, 0], features_pca[i, 1], features_pca[i, 2], label, size=6)
-        ax.set_title("3D PCA + K-Means Clustering")
-        ax.set_xlabel("PCA 1")
-        ax.set_ylabel("PCA 2")
-        ax.set_zlabel("PCA 3")
-        st.pyplot(fig)
-    else:
-        st.warning("Not enough valid CSV files to compute clustering.")
+        if len(feature_list) >= 3:
+            features = np.array(feature_list)
+            scaler = StandardScaler()
+            features_scaled = scaler.fit_transform(features)
+    
+            pca = PCA(n_components=3)
+            features_pca = pca.fit_transform(features_scaled)
+    
+            kmeans = KMeans(n_clusters=2, random_state=0)
+            labels = kmeans.fit_predict(features_pca)
+    
+            # 3D Visualization
+            fig = plt.figure(figsize=(7, 5))
+            ax = fig.add_subplot(111, projection='3d')
+            scatter = ax.scatter(features_pca[:, 0], features_pca[:, 1], features_pca[:, 2],
+                                 c=labels, cmap='viridis', s=50)
+            for i, label in enumerate(filenames_used):
+                ax.text(features_pca[i, 0], features_pca[i, 1], features_pca[i, 2], label, size=6)
+            ax.set_title("3D PCA + K-Means Clustering")
+            ax.set_xlabel("PCA 1")
+            ax.set_ylabel("PCA 2")
+            ax.set_zlabel("PCA 3")
+            st.pyplot(fig)
+        else:
+            st.warning("Not enough valid CSV files to compute clustering.")
 
 else:
     st.info("Please upload a ZIP file containing 1-column CSV signal files.")
