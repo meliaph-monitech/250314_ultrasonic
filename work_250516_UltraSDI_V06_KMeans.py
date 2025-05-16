@@ -42,15 +42,15 @@ def extract_zip(zip_path, extract_dir="ultrasonic_csvs"):
 def extract_features(signal, fs):
     features = {}
 
-    # # Time-domain features
-    # features["mean"] = np.mean(signal)
-    # features["std"] = np.std(signal)
-    # features["max"] = np.max(signal)
-    # features["min"] = np.min(signal)
-    # features["skew"] = skew(signal)
-    # features["kurtosis"] = kurtosis(signal)
-    # features["rms"] = np.sqrt(np.mean(signal**2))
-    # features["crest_factor"] = np.max(np.abs(signal)) / features["rms"]
+    # Time-domain features
+    features["mean"] = np.mean(signal)
+    features["std"] = np.std(signal)
+    features["max"] = np.max(signal)
+    features["min"] = np.min(signal)
+    features["skew"] = skew(signal)
+    features["kurtosis"] = kurtosis(signal)
+    features["rms"] = np.sqrt(np.mean(signal**2))
+    features["crest_factor"] = np.max(np.abs(signal)) / features["rms"]
 
     # Frequency-domain features
     freqs, psd = signal_power_spectrum(signal, fs)
