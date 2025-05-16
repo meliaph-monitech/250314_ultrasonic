@@ -144,7 +144,7 @@ if uploaded_file:
                 ax2.set_xlabel("Time (ms)")
                 ax2.set_ylabel("Amplitude")
                 # ax2.set_title(f"Raw Signal - {base_name}")
-                ax.set_title(f"{base_name}")
+                ax2.set_title(f"{base_name}")
                 st.pyplot(fig2, use_container_width=False)
 else:
     st.info("Please upload a ZIP file containing 1-column CSV signal files.")
