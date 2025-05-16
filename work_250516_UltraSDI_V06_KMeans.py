@@ -134,7 +134,7 @@ if uploaded_file:
             pca = PCA(n_components=3)
             X_pca = pca.fit_transform(X_scaled)
     
-            kmeans = KMeans(n_clusters=2, random_state=0, n_init="auto")
+            kmeans = KMeans(n_clusters=4, random_state=0, n_init="auto")
             labels = kmeans.fit_predict(X_pca)
     
             # 3D scatter plot
