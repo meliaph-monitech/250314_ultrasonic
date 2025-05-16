@@ -113,7 +113,7 @@ if uploaded_file:
                 # ax.set_xlabel("Time (s)")
                 ax.set_xlabel("Time (ms)")
                 ax.set_ylabel("Frequency (kHz)")
-                ax.set_title(f"Spectrogram - {base_name}", fontsize=10)
+                ax.set_title(f"Spectrogram - {base_name}")#, fontsize=10)
                 fig.colorbar(im, ax=ax, label="Intensity (dB)")
                 st.pyplot(fig)
             except Exception as e:
@@ -129,7 +129,7 @@ if uploaded_file:
                 # ax2.set_xlabel("Time (s)")
                 ax2.set_xlabel("Time (ms)")
                 ax2.set_ylabel("Amplitude")
-                ax2.set_title(f"Raw Signal - {base_name}", fontsize=10)
+                ax2.set_title(f"Raw Signal - {base_name}")#, fontsize=10)
 
                 st.pyplot(fig2)
 else:
