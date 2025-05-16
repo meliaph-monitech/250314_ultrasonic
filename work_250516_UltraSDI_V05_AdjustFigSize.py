@@ -127,7 +127,8 @@ if uploaded_file:
                 ax.set_ylim([0, ylimit_khz])
                 ax.set_xlabel("Time (ms)")
                 ax.set_ylabel("Frequency (kHz)")
-                ax.set_title(f"Spectrogram - {base_name}")
+                # ax.set_title(f"Spectrogram - {base_name}")
+                ax.set_title(f"{base_name}")
                 fig.colorbar(im, ax=ax, label="Intensity (dB)")
                 st.pyplot(fig, use_container_width=False)
 
@@ -142,7 +143,8 @@ if uploaded_file:
                 ax2.plot(time_axis, raw_data, color='gray')
                 ax2.set_xlabel("Time (ms)")
                 ax2.set_ylabel("Amplitude")
-                ax2.set_title(f"Raw Signal - {base_name}")
+                # ax2.set_title(f"Raw Signal - {base_name}")
+                ax.set_title(f"{base_name}")
                 st.pyplot(fig2, use_container_width=False)
 else:
     st.info("Please upload a ZIP file containing 1-column CSV signal files.")
