@@ -11,6 +11,7 @@ from scipy import signal, stats
 import zipfile
 import os
 import itertools
+import re
 
 st.set_page_config(layout="wide")
 st.title("Ultrasonic Signal Feature Clustering")
@@ -81,6 +82,15 @@ if uploaded_file:
             df = pd.read_csv(file, header=None)
             data = df.iloc[:, 0]  # Always take the first column
 
+            # Extract annotation from filename
+            filename = os.path.basename(file)
+            try:
+                time_str = filename.split("_")[1]
+                description_match = re.search(r"Sensor01_(.*?)\.csv", filename)
+                label_note = f"{time_str} - {description_match.group(1)}" if description_match else time_str
+            except Exception:
+                label_note = filename  # fallback if format doesn't match
+
             cropped = auto_crop(data.values)
             if len(cropped) < 10:
                 st.warning(f"Skipping {file}: Too short after cropping.")
@@ -88,7 +98,7 @@ if uploaded_file:
 
             features = extract_features(cropped, fs)
             all_features.append(features)
-            file_labels.append(os.path.basename(file))
+            file_labels.append(label_note)
         except Exception as e:
             st.error(f"Error processing {file}: {e}")
 
