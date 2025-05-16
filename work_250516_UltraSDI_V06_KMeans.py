@@ -52,11 +52,11 @@ def extract_features(signal, fs):
     features["rms"] = np.sqrt(np.mean(signal**2))
     features["crest_factor"] = np.max(np.abs(signal)) / features["rms"]
 
-    # # Frequency-domain features
-    # freqs, psd = signal_power_spectrum(signal, fs)
-    # features["spectral_centroid"] = np.sum(freqs * psd) / np.sum(psd)
-    # features["spectral_bandwidth"] = np.sqrt(np.sum((freqs - features["spectral_centroid"])**2 * psd) / np.sum(psd))
-    # features["spectral_entropy"] = -np.sum(psd * np.log(psd + 1e-10)) / np.log(len(psd))
+    # Frequency-domain features
+    freqs, psd = signal_power_spectrum(signal, fs)
+    features["spectral_centroid"] = np.sum(freqs * psd) / np.sum(psd)
+    features["spectral_bandwidth"] = np.sqrt(np.sum((freqs - features["spectral_centroid"])**2 * psd) / np.sum(psd))
+    features["spectral_entropy"] = -np.sum(psd * np.log(psd + 1e-10)) / np.log(len(psd))
 
     return features
 
