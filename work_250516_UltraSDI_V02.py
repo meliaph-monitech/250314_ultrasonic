@@ -57,35 +57,71 @@ if uploaded_file:
                 st.stop()
 
             # Downsampling large signals
-            MAX_SAMPLES = 500_000
-            if len(raw_data) > MAX_SAMPLES:
-                downsample_factor = len(raw_data) // MAX_SAMPLES
-                raw_data = raw_data[::downsample_factor]
-                fs = fs // downsample_factor
-                st.warning(f"Signal was downsampled by {downsample_factor}x for performance.")
+            # MAX_SAMPLES = 500_000
+            # if len(raw_data) > MAX_SAMPLES:
+            #     downsample_factor = len(raw_data) // MAX_SAMPLES
+            #     raw_data = raw_data[::downsample_factor]
+            #     fs = fs // downsample_factor
+            #     st.warning(f"Signal was downsampled by {downsample_factor}x for performance.")
 
-            st.subheader(f"Spectrogram for: {os.path.basename(file_name)}")
+            # st.subheader(f"Spectrogram for: {os.path.basename(file_name)}")
 
-            with st.spinner("Computing spectrogram..."):
-                noverlap = int(noverlap_ratio * nperseg)
-                max_reasonable_nfft = 2 ** int(np.floor(np.log2(len(raw_data))))
-                nfft = min(nfft, max_reasonable_nfft)
+            # with st.spinner("Computing spectrogram..."):
+            #     noverlap = int(noverlap_ratio * nperseg)
+            #     max_reasonable_nfft = 2 ** int(np.floor(np.log2(len(raw_data))))
+            #     nfft = min(nfft, max_reasonable_nfft)
 
-                f_vals, t_vals, Sxx = signal.spectrogram(
-                    raw_data, fs=fs, nperseg=nperseg, noverlap=noverlap, nfft=nfft
-                )
-                Sxx_dB = 20 * np.log10(np.abs(Sxx) + np.finfo(float).eps)
-                max_dB = np.max(Sxx_dB)
-                Sxx_dB[Sxx_dB < max_dB - db_scale] = max_dB - db_scale
+            #     f_vals, t_vals, Sxx = signal.spectrogram(
+            #         raw_data, fs=fs, nperseg=nperseg, noverlap=noverlap, nfft=nfft
+            #     )
+            #     Sxx_dB = 20 * np.log10(np.abs(Sxx) + np.finfo(float).eps)
+            #     max_dB = np.max(Sxx_dB)
+            #     Sxx_dB[Sxx_dB < max_dB - db_scale] = max_dB - db_scale
 
-                # Plot Spectrogram
-                fig, ax = plt.subplots(figsize=(8, 3))
-                pcm = ax.pcolormesh(t_vals, f_vals, Sxx_dB, shading='gouraud', cmap='jet')
-                ax.set_ylim([0, ylimit])
-                ax.set_ylabel("Frequency (Hz)")
-                ax.set_xlabel("Time (s)")
-                fig.colorbar(pcm, ax=ax, label="Intensity (dB)")
-                st.pyplot(fig)
+            #     # Plot Spectrogram
+            #     fig, ax = plt.subplots(figsize=(8, 3))
+            #     pcm = ax.pcolormesh(t_vals, f_vals, Sxx_dB, shading='gouraud', cmap='jet')
+            #     ax.set_ylim([0, ylimit])
+            #     ax.set_ylabel("Frequency (Hz)")
+            #     ax.set_xlabel("Time (s)")
+            #     fig.colorbar(pcm, ax=ax, label="Intensity (dB)")
+            #     st.pyplot(fig)
+
+                MAX_SAMPLES = 100_000  # More aggressive cap
+                if len(raw_data) > MAX_SAMPLES:
+                    factor = len(raw_data) // MAX_SAMPLES
+                    raw_data = raw_data[::factor]
+                    fs = fs // factor
+                    st.warning(f"Downsampled by {factor}x to reduce memory usage.")
+                
+                # Cap nfft and nperseg to match data size
+                nperseg = min(nperseg, len(raw_data) // 8)
+                nfft = min(nfft, 2 ** int(np.floor(np.log2(len(raw_data)))))
+                
+                # Compute Spectrogram
+                with st.spinner("Computing spectrogram..."):
+                    try:
+                        noverlap = int(noverlap_ratio * nperseg)
+                        f_vals, t_vals, Sxx = signal.spectrogram(
+                            raw_data, fs=fs, nperseg=nperseg, noverlap=noverlap, nfft=nfft, scaling='spectrum'
+                        )
+                        Sxx_dB = 20 * np.log10(np.abs(Sxx) + np.finfo(float).eps)
+                        max_dB = np.max(Sxx_dB)
+                        Sxx_dB[Sxx_dB < max_dB - db_scale] = max_dB - db_scale
+                
+                        # Efficient plotting using imshow
+                        fig, ax = plt.subplots(figsize=(8, 3))
+                        extent = [t_vals[0], t_vals[-1], f_vals[0], f_vals[-1]]
+                        im = ax.imshow(Sxx_dB, aspect='auto', extent=extent, origin='lower', cmap='jet')
+                        ax.set_ylim([0, ylimit])
+                        ax.set_xlabel("Time (s)")
+                        ax.set_ylabel("Frequency (Hz)")
+                        fig.colorbar(im, ax=ax, label="Intensity (dB)")
+                        st.pyplot(fig)
+                    except Exception as e:
+                        st.error(f"Spectrogram computation failed: {e}")
+                        st.stop()
+
 
                 # Optional download
                 buf = io.BytesIO()
