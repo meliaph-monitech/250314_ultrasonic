@@ -11,6 +11,7 @@ from scipy import signal, stats
 import zipfile
 import os
 import itertools
+import re
 
 st.set_page_config(layout="wide")
 st.title("Ultrasonic Signal Feature Clustering")
@@ -76,19 +77,45 @@ if uploaded_file:
     all_features = []
     file_labels = []
 
-    for file in file_paths:
-        try:
-            df = pd.read_csv(file, header=None)
-            data = df.iloc[:, 0]  # Always take the first column
+    # for file in file_paths:
+    #     try:
+    #         df = pd.read_csv(file, header=None)
+    #         data = df.iloc[:, 0]  # Always take the first column
 
-            cropped = auto_crop(data.values)
-            if len(cropped) < 10:
-                st.warning(f"Skipping {file}: Too short after cropping.")
-                continue
+    #         cropped = auto_crop(data.values)
+    #         if len(cropped) < 10:
+    #             st.warning(f"Skipping {file}: Too short after cropping.")
+    #             continue
 
-            features = extract_features(cropped, fs)
-            all_features.append(features)
-            file_labels.append(os.path.basename(file))
+    #         features = extract_features(cropped, fs)
+    #         all_features.append(features)
+    #         file_labels.append(os.path.basename(file))
+        
+        
+        for file in file_paths:
+            try:
+                data = pd.read_csv(file, header=None).squeeze("columns")
+        
+                cropped = auto_crop(data.values)
+                if len(cropped) < 10:
+                    st.warning(f"Skipping {file}: Too short after cropping.")
+                    continue
+        
+                features = extract_features(cropped, fs)
+                all_features.append(features)
+        
+                # Extract annotations from filename
+                basename = os.path.basename(file)
+                match = re.search(r'_(\d{6})_Sensor01_(.+)\.csv$', basename)
+                if match:
+                    hhmmss = match.group(1)
+                    tag = match.group(2)
+                    label = f"{hhmmss}_{tag}"
+                else:
+                    label = basename  # fallback if format doesn't match
+        
+                file_labels.append(label)
+    
         except Exception as e:
             st.error(f"Error processing {file}: {e}")
 
