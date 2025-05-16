@@ -138,7 +138,7 @@ if file_name:
             ax.set_ylim([0, ylimit_khz])
             ax.set_xlabel("Time (ms)")
             ax.set_ylabel("Frequency (kHz)")
-            ax.set_title(f"{base_name}")
+            # ax.set_title(f"{base_name}")
             fig.colorbar(im, ax=ax, label="Intensity (dB)")
             st.pyplot(fig, use_container_width=False)
 
