@@ -75,20 +75,31 @@ if uploaded_file:
     file_paths = extract_zip("temp_upload.zip")
     all_features = []
     file_labels = []
-
+    
     for file in file_paths:
         try:
-            df = pd.read_csv(file, header=None)
-            data = df.iloc[:, 0]  # Always take the first column
-
+            data = pd.read_csv(file, header=None).squeeze("columns")
+    
             cropped = auto_crop(data.values)
             if len(cropped) < 10:
                 st.warning(f"Skipping {file}: Too short after cropping.")
                 continue
-
+    
             features = extract_features(cropped, fs)
             all_features.append(features)
-            file_labels.append(os.path.basename(file))
+    
+            # Extract annotations from filename
+            basename = os.path.basename(file)
+            match = re.search(r'_(\d{6})_Sensor01_(.+)\.csv$', basename)
+            if match:
+                hhmmss = match.group(1)
+                tag = match.group(2)
+                label = f"{hhmmss}_{tag}"
+            else:
+                label = basename  # fallback if format doesn't match
+    
+            file_labels.append(label)
+
         except Exception as e:
             st.error(f"Error processing {file}: {e}")
 
