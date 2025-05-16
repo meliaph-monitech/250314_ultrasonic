@@ -118,7 +118,7 @@ if uploaded_file:
                 ax.set_ylabel("Frequency (kHz)")
                 ax.set_title(f"Spectrogram - {base_name}")
                 fig.colorbar(im, ax=ax, label="Intensity (dB)")
-                st.pyplot(fig)
+                st.pyplot(fig, use_container_width=False)
 
             except Exception as e:
                 st.error(f"Spectrogram computation failed: {e}")
@@ -132,7 +132,7 @@ if uploaded_file:
                 ax2.set_xlabel("Time (ms)")
                 ax2.set_ylabel("Amplitude")
                 ax2.set_title(f"Raw Signal - {base_name}")
-                st.pyplot(fig2)
+                st.pyplot(fig2, use_container_width=False)
 
 else:
     st.info("Please upload a ZIP file containing 1-column CSV signal files.")
