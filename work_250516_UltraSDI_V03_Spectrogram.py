@@ -28,7 +28,7 @@ with st.sidebar:
     nperseg = st.number_input("nperseg", min_value=64, max_value=8192, value=1024)
     noverlap_ratio = st.slider("Overlap Ratio", min_value=0.0, max_value=0.99, value=0.9)
     nfft = st.number_input("nfft", min_value=256, max_value=16384, value=2048)
-    db_scale = st.number_input("dB Dynamic Range", min_value=20, max_value=150, value=100)
+    db_scale = st.number_input("dB Dynamic Range", min_value=20, max_value=500, value=250)
     ylimit = st.number_input("Max Frequency Display (Hz)", min_value=1000, max_value=int(fs / 2), value=10000)
 
 # --- Main Logic ---
