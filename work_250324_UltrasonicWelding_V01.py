@@ -41,7 +41,9 @@ if uploaded_file:
     file_name = st.selectbox("Select a CSV file to visualize", file_paths)
 
     if file_name:
-        raw_data = pd.read_csv(file_name, header=None, usecols=[0], encoding='latin1').squeeze("columns")
+        raw_data = pd.read_csv(file_name, header=None, encoding='latin1')
+        raw_data = raw_data.iloc[:, 0]  # Just take the first column, ignore the rest
+
         if raw_data.ndim > 1:
             st.error("CSV file has more than one column. Please ensure it's a single-column signal file.")
         else:
