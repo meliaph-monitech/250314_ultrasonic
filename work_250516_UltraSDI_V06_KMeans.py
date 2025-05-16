@@ -90,6 +90,70 @@ if uploaded_file:
     file_paths = extract_zip("temp_ultrasonic.zip")
     st.success(f"Extracted {len(file_paths)} CSV files")
 
+    # --- Feature Extraction and K-Means Clustering Across Files ---
+    with st.expander("📊 Feature-Based Clustering with PCA (All Files)", expanded=True):
+        feature_list = []
+        filenames_used = []
+    
+        for path in file_paths:
+            try:
+                data = pd.read_csv(path, header=None, usecols=[0], encoding='latin1').squeeze("columns")
+    
+                # Auto-trim to active signal
+                threshold = 0.02 * np.max(np.abs(data))
+                active_idx = np.where(np.abs(data) > threshold)[0]
+                if len(active_idx) > 0:
+                    data = data[max(0, active_idx[0] - 1000): min(len(data), active_idx[-1] + 1000)]
+    
+                # Time-domain features
+                mean_val = np.mean(data)
+                std_val = np.std(data)
+                max_val = np.max(data)
+                min_val = np.min(data)
+                rms = np.sqrt(np.mean(np.square(data)))
+                energy = np.sum(np.square(data))
+                skew = pd.Series(data).skew()
+                kurt = pd.Series(data).kurt()
+    
+                # Frequency-domain features
+                freqs, psd = signal.welch(data, fs)
+                spectral_centroid = np.sum(freqs * psd) / np.sum(psd)
+                spectral_bw = np.sqrt(np.sum(((freqs - spectral_centroid) ** 2) * psd) / np.sum(psd))
+    
+                feature_vector = [mean_val, std_val, max_val, min_val, rms, energy, skew, kurt, spectral_centroid, spectral_bw]
+                feature_list.append(feature_vector)
+                filenames_used.append(os.path.basename(path))
+    
+            except Exception as e:
+                st.warning(f"Error in {os.path.basename(path)}: {e}")
+    
+        if len(feature_list) >= 3:
+            X = np.array(feature_list)
+            X_scaled = StandardScaler().fit_transform(X)
+    
+            pca = PCA(n_components=3)
+            X_pca = pca.fit_transform(X_scaled)
+    
+            kmeans = KMeans(n_clusters=2, random_state=0, n_init="auto")
+            labels = kmeans.fit_predict(X_pca)
+    
+            # 3D scatter plot
+            fig = plt.figure(figsize=(7, 5))
+            ax = fig.add_subplot(111, projection='3d')
+            scatter = ax.scatter(X_pca[:, 0], X_pca[:, 1], X_pca[:, 2], c=labels, cmap='coolwarm', s=60)
+    
+            for i, fname in enumerate(filenames_used):
+                ax.text(X_pca[i, 0], X_pca[i, 1], X_pca[i, 2], fname[:8], fontsize=6)
+    
+            ax.set_xlabel("PCA 1")
+            ax.set_ylabel("PCA 2")
+            ax.set_zlabel("PCA 3")
+            ax.set_title("3D PCA + KMeans Clustering")
+            st.pyplot(fig)
+        else:
+            st.warning("Not enough valid files to perform clustering.")
+    
+
     file_labels = [os.path.basename(f) for f in file_paths]
     selected_label = st.selectbox("Select a CSV file to visualize", file_labels)
     file_name = file_paths[file_labels.index(selected_label)]
@@ -177,66 +241,6 @@ if file_name:
         except Exception as e:
             st.error(f"Spectrogram computation failed: {e}")
             st.stop()
-
-# --- Feature Extraction and K-Means Clustering Across All Files ---
-with st.expander("📊 Feature-Based Clustering Across All Signals", expanded=True):
-    feature_list = []
-    filenames_used = []
-
-    for path in file_paths:
-        try:
-            data = pd.read_csv(path, header=None, usecols=[0], encoding='latin1').squeeze("columns")
-            # Auto-cropping
-            threshold = 0.02 * np.max(np.abs(data))
-            active_idx = np.where(np.abs(data) > threshold)[0]
-            if len(active_idx) > 0:
-                data = data[max(0, active_idx[0] - 1000): min(len(data), active_idx[-1] + 1000)]
-            
-            # Basic time-domain features
-            mean_val = np.mean(data)
-            std_val = np.std(data)
-            max_val = np.max(data)
-            min_val = np.min(data)
-            energy = np.sum(np.square(data))
-            rms = np.sqrt(np.mean(np.square(data)))
-            skew = pd.Series(data).skew()
-            kurt = pd.Series(data).kurt()
-
-            # Frequency domain features
-            freqs, psd = signal.welch(data, fs)
-            spectral_centroid = np.sum(freqs * psd) / np.sum(psd)
-            spectral_bandwidth = np.sqrt(np.sum(((freqs - spectral_centroid) ** 2) * psd) / np.sum(psd))
-
-            feature_list.append([mean_val, std_val, max_val, min_val, energy, rms, skew, kurt, spectral_centroid, spectral_bandwidth])
-            filenames_used.append(os.path.basename(path))
-        except Exception as e:
-            st.warning(f"Could not process file {os.path.basename(path)}: {e}")
-
-        if len(feature_list) >= 3:
-            features = np.array(feature_list)
-            scaler = StandardScaler()
-            features_scaled = scaler.fit_transform(features)
-    
-            pca = PCA(n_components=3)
-            features_pca = pca.fit_transform(features_scaled)
-    
-            kmeans = KMeans(n_clusters=2, random_state=0)
-            labels = kmeans.fit_predict(features_pca)
-    
-            # 3D Visualization
-            fig = plt.figure(figsize=(7, 5))
-            ax = fig.add_subplot(111, projection='3d')
-            scatter = ax.scatter(features_pca[:, 0], features_pca[:, 1], features_pca[:, 2],
-                                 c=labels, cmap='viridis', s=50)
-            for i, label in enumerate(filenames_used):
-                ax.text(features_pca[i, 0], features_pca[i, 1], features_pca[i, 2], label, size=6)
-            ax.set_title("3D PCA + K-Means Clustering")
-            ax.set_xlabel("PCA 1")
-            ax.set_ylabel("PCA 2")
-            ax.set_zlabel("PCA 3")
-            st.pyplot(fig)
-        else:
-            st.warning("Not enough valid CSV files to compute clustering.")
 
 else:
     st.info("Please upload a ZIP file containing 1-column CSV signal files.")
