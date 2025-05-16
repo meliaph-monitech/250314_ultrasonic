@@ -12,13 +12,13 @@ st.title("Ultrasonic Welding Signal Spectrogram Viewer")
 
 # --- Session state for persistent parameters ---
 if "spec_width" not in st.session_state:
-    st.session_state.spec_width = 10.0
+    st.session_state.spec_width = 2.5
 if "spec_height" not in st.session_state:
-    st.session_state.spec_height = 3.0
+    st.session_state.spec_height = 4.0
 if "signal_width" not in st.session_state:
-    st.session_state.signal_width = 10.0
+    st.session_state.signal_width = 1.8
 if "signal_height" not in st.session_state:
-    st.session_state.signal_height = 1.5
+    st.session_state.signal_height = 1.0
 if "crop_ranges" not in st.session_state:
     st.session_state.crop_ranges = {}
 
