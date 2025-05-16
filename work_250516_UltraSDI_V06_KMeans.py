@@ -123,7 +123,7 @@ if uploaded_file:
         pca = PCA(n_components=3)
         X_pca = pca.fit_transform(X_scaled)
 
-        fig = plt.figure(figsize=(10, 6))
+        fig = plt.figure(figsize=(8, 5))
         ax = fig.add_subplot(111, projection='3d')
         scatter = ax.scatter(X_pca[:, 0], X_pca[:, 1], X_pca[:, 2], c=clusters, cmap='Set1', s=60)
         ax.set_title("3D PCA Clustering")
