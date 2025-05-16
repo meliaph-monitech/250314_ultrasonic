@@ -52,7 +52,7 @@ if uploaded_file:
             st.subheader(f"Spectrogram for: {os.path.basename(file_name)}")
 
             # --- Auto-cropping based on signal activity ---
-            threshold = 0.01 * np.max(np.abs(raw_data))
+            threshold = 0.02 * np.max(np.abs(raw_data))
             active_indices = np.where(np.abs(raw_data) > threshold)[0]
             if len(active_indices) > 0:
                 start_idx = max(0, active_indices[0] - 1000)
