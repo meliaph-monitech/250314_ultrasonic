@@ -132,7 +132,7 @@ if uploaded_file:
         ax.set_zlabel("PC3")
         for i, label in enumerate(file_labels):
             ax.text(X_pca[i, 0], X_pca[i, 1], X_pca[i, 2], label, fontsize=6)
-        st.pyplot(fig)
+        st.pyplot(fig, use_container_width=False)
 
         df_features['Cluster'] = clusters
         st.dataframe(df_features)
