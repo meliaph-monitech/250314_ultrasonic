@@ -24,6 +24,7 @@ def extract_zip(zip_path, extract_dir="ultrasonic_csvs"):
 # --- Sidebar: Upload & Parameters ---
 with st.sidebar:
     uploaded_file = st.file_uploader("Upload ZIP of CSVs (1-column ultrasonic data)", type="zip")
+    st.markdown("### Spectrogram Parameters")
     fs = st.number_input("Sampling Frequency (Hz)", min_value=1000, max_value=500000, value=500000)
     nperseg = st.number_input("nperseg", min_value=64, max_value=8192, value=1024)
     noverlap_ratio = st.slider("Overlap Ratio", min_value=0.0, max_value=0.99, value=0.9)
@@ -73,12 +74,27 @@ if uploaded_file:
                     step=1
                 )
                 do_crop = st.button("Revisualize")
-
+            
+                # Plot dimension inputs (applied only on Revisualize)
+                st.markdown("### Plot Dimensions")
+                input_spec_width = st.number_input("Spectrogram Width", min_value=2.0, max_value=20.0, value=10.0, step=0.5)
+                input_spec_height = st.number_input("Spectrogram Height", min_value=1.0, max_value=10.0, value=3.0, step=0.5)
+                input_raw_width = st.number_input("Raw Signal Width", min_value=2.0, max_value=20.0, value=10.0, step=0.5)
+                input_raw_height = st.number_input("Raw Signal Height", min_value=1.0, max_value=10.0, value=1.5, step=0.5)
+            
             if do_crop:
+                # Apply cropping
                 crop_start_idx = int((crop_start_ms / 1000) * fs)
                 crop_end_idx = int((crop_end_ms / 1000) * fs)
                 raw_data = raw_data[crop_start_idx:crop_end_idx]
                 st.info(f"Cropping applied: {crop_end_ms - crop_start_ms} ms window.")
+            
+                # Assign plot sizes only when Revisualize is clicked
+                spec_width = input_spec_width
+                spec_height = input_spec_height
+                raw_width = input_raw_width
+                raw_height = input_raw_height
+
 
             # --- Downsampling if too long ---
             MAX_SAMPLES = 200_000
@@ -101,7 +117,7 @@ if uploaded_file:
                 max_dB = np.max(Sxx_dB)
                 Sxx_dB[Sxx_dB < max_dB - db_scale] = max_dB - db_scale
 
-                fig, ax = plt.subplots(figsize=(8, 3))
+                fig, ax = plt.subplots(figsize=(spec_width, spec_height))
                 # extent = [t_vals[0], t_vals[-1], f_vals[0] / 1000, f_vals[-1] / 1000]  # kHz
                 extent = [t_vals[0] * 1000, t_vals[-1] * 1000, f_vals[0] / 1000, f_vals[-1] / 1000]  # Time in ms, Frequency in kHz
                 
@@ -117,7 +133,7 @@ if uploaded_file:
                 st.stop()
 
             with st.expander("Raw Signal Plot"):
-                fig2, ax2 = plt.subplots(figsize=(10, 2))
+                fig2, ax2 = plt.subplots(figsize=(raw_width, raw_height))
                 # time_axis = np.arange(len(raw_data)) / fs
                 time_axis = np.arange(len(raw_data)) / fs * 1000
                 
