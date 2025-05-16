@@ -45,10 +45,10 @@ with st.sidebar:
     db_scale = st.number_input("dB Dynamic Range", min_value=20, max_value=500, value=250)
     ylimit_khz = st.number_input("Max Frequency Display (kHz)", min_value=1, max_value=int(fs / 2000), value=250)
     st.markdown("### Plot Dimensions")
-    st.session_state.spec_width = st.slider("Spectrogram Width", 1.0, 20.0, st.session_state.spec_width, step=0.5)
-    st.session_state.spec_height = st.slider("Spectrogram Height", 1.0, 20.0, st.session_state.spec_height, step=0.5)
-    st.session_state.signal_width = st.slider("Signal Plot Width", 1.0, 20.0, st.session_state.signal_width, step=0.5)
-    st.session_state.signal_height = st.slider("Signal Plot Height", 1.0, 20.0, st.session_state.signal_height, step=0.5)
+    st.session_state.spec_width = st.slider("Spectrogram Width", 1.0, 10.0, st.session_state.spec_width, step=0.1)
+    st.session_state.spec_height = st.slider("Spectrogram Height", 1.0, 10.0, st.session_state.spec_height, step=0.1)
+    st.session_state.signal_width = st.slider("Signal Plot Width", 1.0, 10.0, st.session_state.signal_width, step=0.1)
+    st.session_state.signal_height = st.slider("Signal Plot Height", 1.0, 10.0, st.session_state.signal_height, step=0.1)
 
 # --- Main Logic ---
 if uploaded_file:
