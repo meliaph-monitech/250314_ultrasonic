@@ -81,7 +81,7 @@ if uploaded_file:
                 st.info(f"Cropping applied: {crop_end_ms - crop_start_ms} ms window.")
 
             # --- Downsampling if too long ---
-            MAX_SAMPLES = 250_000
+            MAX_SAMPLES = 200_000
             if len(raw_data) > MAX_SAMPLES:
                 factor = len(raw_data) // MAX_SAMPLES
                 raw_data = raw_data[::factor]
