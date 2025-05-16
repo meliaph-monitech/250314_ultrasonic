@@ -74,10 +74,10 @@ if uploaded_file:
                     step=1
                 )
                 st.markdown("### Plot Dimensions")
-                spec_width = st.slider("Spectrogram Width", 4, 20, 8)
-                spec_height = st.slider("Spectrogram Height", 2, 10, 3)
-                signal_width = st.slider("Signal Plot Width", 4, 20, 10)
-                signal_height = st.slider("Signal Plot Height", 1, 5, 1.5)
+                spec_width = st.slider("Spectrogram Width", 4, 20, 8, 1.5, step=0.1)
+                spec_height = st.slider("Spectrogram Height", 2, 10, 3, 1.5, step=0.1)
+                signal_width = st.slider("Signal Plot Width", 4, 20, 10, 1.5, step=0.1)
+                signal_height = st.slider("Signal Plot Height", 1.0, 5.0, 1.5, step=0.1)
                 do_crop = st.button("Revisualize")
 
             # --- Optional Cropping ---
