@@ -78,10 +78,8 @@ if uploaded_file:
 
     for file in file_paths:
         try:
-            data = pd.read_csv(file, header=None).squeeze("columns")
-            if data.ndim > 1:
-                st.warning(f"Skipping {file}: More than one column.")
-                continue
+            df = pd.read_csv(file, header=None)
+            data = df.iloc[:, 0]  # Always take the first column
 
             cropped = auto_crop(data.values)
             if len(cropped) < 10:
