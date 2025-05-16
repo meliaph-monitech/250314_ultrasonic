@@ -29,7 +29,7 @@ with st.sidebar:
     noverlap_ratio = st.slider("Overlap Ratio", min_value=0.0, max_value=0.99, value=0.9)
     nfft = st.number_input("nfft", min_value=256, max_value=16384, value=2048)
     db_scale = st.number_input("dB Dynamic Range", min_value=20, max_value=500, value=250)
-    ylimit_khz = st.number_input("Max Frequency Display (kHz)", min_value=1, max_value=int(fs / 2000), value=10)
+    ylimit_khz = st.number_input("Max Frequency Display (kHz)", min_value=1, max_value=int(fs / 2000), value=250)
 
 # --- Main Logic ---
 if uploaded_file:
