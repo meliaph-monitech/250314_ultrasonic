@@ -104,7 +104,7 @@ if uploaded_file:
                 max_dB = np.max(Sxx_dB)
                 Sxx_dB[Sxx_dB < max_dB - db_scale] = max_dB - db_scale
 
-                fig, ax = plt.subplots(figsize=(8, 3))
+                fig, ax = plt.subplots(figsize=(4, 8))
                 # extent = [t_vals[0], t_vals[-1], f_vals[0] / 1000, f_vals[-1] / 1000]  # kHz
                 extent = [t_vals[0] * 1000, t_vals[-1] * 1000, f_vals[0] / 1000, f_vals[-1] / 1000]  # Time in ms, Frequency in kHz
                 
@@ -121,7 +121,7 @@ if uploaded_file:
                 st.stop()
 
             with st.expander("Raw Signal Plot"):
-                fig2, ax2 = plt.subplots(figsize=(10, 2))
+                fig2, ax2 = plt.subplots(figsize=(10, 1.5))
                 # time_axis = np.arange(len(raw_data)) / fs
                 time_axis = np.arange(len(raw_data)) / fs * 1000
                 
